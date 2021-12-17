@@ -15,7 +15,6 @@ do
       end)
       while true do
         local _, cmd = coroutine.resume(co)
-        print(cmd)
         if cmd then
           vim.cmd(cmd)
         end
@@ -97,7 +96,6 @@ do
       local groups = { }
       for _index_0 = 1, #tags do
         local tag = tags[_index_0]
-        print(tags)
         tag.language = tag.language:lower()
         if self.opts.ft_conv[tag.language] then
           tag.language = self.opts.ft_conv[tag.language]
@@ -203,9 +201,6 @@ return {
   end,
   highlight = function()
     return neotags:run()
-  end,
-  highlight_x = function()
-    return neotags:highlight()
   end,
   language = function(lang, opts)
     return neotags:language(lang, opts)

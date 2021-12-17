@@ -34,7 +34,6 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            print cmd
             vim.cmd(cmd) if cmd
             break if coroutine.status(co) == 'dead'
 
@@ -92,7 +91,6 @@ class Neotags
         groups = {}
 
         for tag in *tags
-            print tags
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
 
@@ -133,6 +131,5 @@ return {
         ]]
 
     highlight: () -> neotags\run()
-    highlight_x: () -> neotags\highlight()
     language: (lang, opts) -> neotags\language(lang, opts)
 }
