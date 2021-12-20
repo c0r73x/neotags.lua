@@ -2,6 +2,14 @@ local Utils
 do
   local _class_0
   local _base_0 = {
+    contains = function(list, el)
+      for _, value in pairs(list) do
+        if value == el then
+          return true
+        end
+      end
+      return false
+    end,
     concat = function(a, b)
       if not b then
         return a

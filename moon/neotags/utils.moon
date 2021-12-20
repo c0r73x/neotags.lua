@@ -1,4 +1,9 @@
 class Utils
+    contains: (list, el) ->
+        for _, value in pairs(list)
+            return true if value == el
+        return false
+
     concat: (a, b) ->
         return a if not b
         return b if not a

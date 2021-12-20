@@ -164,14 +164,6 @@ do
     language = function(self, lang, opts)
       self.languages[lang] = opts
     end,
-    contains = function(self, tags, el)
-      for _, value in pairs(tags) do
-        if value == el then
-          return true
-        end
-      end
-      return false
-    end,
     clearsyntax = function(self)
       vim.cmd([[            augroup NeotagsLua
             autocmd!
@@ -189,9 +181,6 @@ do
       local keywords = { }
       local prefix = opts.prefix or self.opts.hl.prefix
       local suffix = opts.suffix or self.opts.hl.suffix
-      local mustmatch = {
-        contains = true
-      }
       for _index_0 = 1, #group do
         local _continue_0 = false
         repeat
@@ -204,12 +193,12 @@ do
             _continue_0 = true
             break
           end
-          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:match('%.') and not mustmatch[tag.name]) then
-            if not self:contains(keywords, tag.name) then
+          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:match('%.') and not tag.name == contains and not opt.notin) then
+            if not Utils.contains(keywords, tag.name) then
               table.insert(keywords, tag.name)
             end
           else
-            if not self:contains(matches, tag.name) then
+            if not Utils.contains(matches, tag.name) then
               table.insert(matches, tag.name)
             end
           end
@@ -228,7 +217,7 @@ do
         local current = {
           unpack(matches, i, i + self.opts.hl.patternlength)
         }
-        notin = table.concat(self.opts.notin, ',')
+        notin = table.concat(opts.notin or self.opts.notin, ',')
         local str = table.concat(current, '\\|')
         coroutine.yield("syntax match " .. tostring(hl) .. " /" .. tostring(prefix) .. "\\%(" .. tostring(str) .. "\\)" .. tostring(suffix) .. "/ containedin=ALLBUT," .. tostring(notin) .. " display")
       end
@@ -245,7 +234,8 @@ do
       return table.insert(self.syntax_groups, hl)
     end,
     highlight = function(self)
-      if self:contains(self.opts.ignore, vim.bo.filetype) then
+      local ft = vim.bo.filetype
+      if Utils.contains(self.opts.ignore, ft) then
         return 
       end
       local bufnr = api.nvim_get_current_buf()
@@ -253,18 +243,29 @@ do
       local tags = vim.fn.taglist('.*')
       local groups = { }
       for _index_0 = 1, #tags do
-        local tag = tags[_index_0]
-        tag.language = tag.language:lower()
-        if self.opts.ft_conv[tag.language] then
-          tag.language = self.opts.ft_conv[tag.language]
+        local _continue_0 = false
+        repeat
+          local tag = tags[_index_0]
+          tag.language = tag.language:lower()
+          if self.opts.ft_conv[tag.language] then
+            tag.language = self.opts.ft_conv[tag.language]
+          end
+          if self.opts.ft_map[ft] and not Utils.contains(self.opts.ft_map[ft], tag.language) then
+            _continue_0 = true
+            break
+          end
+          if not groups[tag.language] then
+            groups[tag.language] = { }
+          end
+          if not groups[tag.language][tag.kind] then
+            groups[tag.language][tag.kind] = { }
+          end
+          table.insert(groups[tag.language][tag.kind], tag)
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
         end
-        if not groups[tag.language] then
-          groups[tag.language] = { }
-        end
-        if not groups[tag.language][tag.kind] then
-          groups[tag.language][tag.kind] = { }
-        end
-        table.insert(groups[tag.language][tag.kind], tag)
       end
       for lang, kinds in pairs(groups) do
         local _continue_0 = false
@@ -287,6 +288,7 @@ do
                 _continue_1 = true
                 break
               end
+              print("adding " .. tostring(kinds[kind]) .. " for " .. tostring(lang) .. " in " .. tostring(kind))
               self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
               _continue_1 = true
             until true
@@ -311,6 +313,12 @@ do
           ['c++'] = 'cpp',
           ['moonscript'] = 'moon',
           ['c#'] = 'cs'
+        },
+        ft_map = {
+          cpp = {
+            'cpp',
+            'c'
+          }
         },
         hl = {
           patternlength = 2048,

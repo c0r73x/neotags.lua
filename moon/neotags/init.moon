@@ -12,6 +12,9 @@ class Neotags
                 ['moonscript']: 'moon',
                 ['c#']: 'cs',
             },
+            ft_map: {
+                cpp: { 'cpp', 'c' },
+            },
             hl: {
                 patternlength: 2048,
                 prefix: [[\C\<]],
@@ -182,11 +185,6 @@ class Neotags
     language: (lang, opts) =>
         @languages[lang] = opts
 
-    contains: (tags, el) =>
-        for _, value in pairs(tags)
-            return true if value == el
-        return false
-
     clearsyntax: () =>
         vim.cmd[[
             augroup NeotagsLua
@@ -209,20 +207,16 @@ class Neotags
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
 
-        mustmatch = {
-            contains: true,
-        }
-
         for tag in *group
             continue if tag.name\match('^__anon.*$')
             continue if not content\find(tag.name)
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\match('%.') and
-                    not mustmatch[tag.name])
-                table.insert(keywords, tag.name) if not @contains(keywords, tag.name)
+                    not tag.name == contains and not opt.notin)
+                table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
             else
-                table.insert(matches, tag.name) if not @contains(matches, tag.name)
+                table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
 
         coroutine.yield("silent! syntax clear #{hl}")
         coroutine.yield("hi def link #{hl} #{opts.group}")
@@ -230,7 +224,7 @@ class Neotags
         table.sort(matches, (a, b) -> a < b)
         for i = 1, #matches, @opts.hl.patternlength
             current = {unpack(matches, i, i + @opts.hl.patternlength)}
-            notin = table.concat(@opts.notin, ',')
+            notin = table.concat(opts.notin or @opts.notin, ',')
             str = table.concat(current, '\\|')
             coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ containedin=ALLBUT,#{notin} display")
 
@@ -243,7 +237,9 @@ class Neotags
         table.insert(@syntax_groups, hl)
 
     highlight: () =>
-        return if @contains(@opts.ignore, vim.bo.filetype)
+        ft = vim.bo.filetype
+
+        return if Utils.contains(@opts.ignore, ft)
 
         bufnr = api.nvim_get_current_buf()
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
@@ -255,8 +251,12 @@ class Neotags
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
 
+            if @opts.ft_map[ft] and not Utils.contains(@opts.ft_map[ft], tag.language)
+                continue
+
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
+
             table.insert(groups[tag.language][tag.kind], tag)
 
         for lang, kinds in pairs(groups)
@@ -270,6 +270,7 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
+                print "adding #{kinds[kind]} for #{lang} in #{kind}"
                 @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
 
 export neotags = Neotags! if not neotags
