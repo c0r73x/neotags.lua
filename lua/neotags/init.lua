@@ -37,7 +37,10 @@ do
       if self.ctags_handle then
         return 
       end
-      local stderr = loop.new_pipe(false)
+      local stderr
+      if not self.opts.ctags.silent then
+        stderr = loop.new_pipe(false)
+      end
       local stdout = loop.new_pipe(false)
       self.ctags_handle = loop.spawn(self.opts.ctags.binary, {
         args = args,
@@ -50,8 +53,10 @@ do
       }, vim.schedule_wrap(function()
         stdout:read_stop()
         stdout:close()
-        stderr:read_stop()
-        stderr:close()
+        if not self.opts.ctags.silent then
+          stderr:read_stop()
+          stderr:close()
+        end
         self.ctags_handle:close()
         vim.bo.tags = tagfile
         vim.cmd("doautocmd User NeotagsCtagsComplete")
@@ -62,11 +67,13 @@ do
           return print(data)
         end
       end)
-      return loop.read_start(stderr, function(err, data)
-        if data then
-          return print(data)
-        end
-      end)
+      if not self.opts.ctags.silent then
+        return loop.read_start(stderr, function(err, data)
+          if data then
+            return print(data)
+          end
+        end)
+      end
     end,
     update = function(self)
       if not self.opts.enable then
@@ -341,14 +348,14 @@ do
         ctags = {
           run = true,
           directory = vim.fn.expand('~/.vim_tags'),
+          silent = true,
           binary = 'ctags',
           args = {
             '--fields=+l',
             '--c-kinds=+p',
             '--c++-kinds=+p',
-            '--sort=yes',
-            "--exclude='.mypy_cache'",
-            [[--regex-go=/^\s*(var)?\s*(\w*)\s*:?=\s*func/\2/f/]]
+            '--sort=no',
+            '-a'
           }
         },
         ignore = {

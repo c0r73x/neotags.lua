@@ -27,14 +27,14 @@ class Neotags
             ctags: {
                 run: true,
                 directory: vim.fn.expand('~/.vim_tags'),
+                silent: true,
                 binary: 'ctags'
                 args: {
                     '--fields=+l',
                     '--c-kinds=+p',
                     '--c++-kinds=+p',
-                    '--sort=yes',
-                    "--exclude='.mypy_cache'",
-                    [[--regex-go=/^\s*(var)?\s*(\w*)\s*:?=\s*func/\2/f/]]
+                    '--sort=no',
+                    '-a',
                 },
             },
             ignore: {
@@ -93,7 +93,7 @@ class Neotags
 
         return if @ctags_handle
 
-        stderr = loop.new_pipe(false)
+        stderr = loop.new_pipe(false) if not @opts.ctags.silent
         stdout = loop.new_pipe(false)
 
         @ctags_handle = loop.spawn(
@@ -105,8 +105,11 @@ class Neotags
             vim.schedule_wrap(() ->
                 stdout\read_stop()
                 stdout\close()
-                stderr\read_stop()
-                stderr\close()
+
+                if not @opts.ctags.silent
+                    stderr\read_stop() 
+                    stderr\close()
+
                 @ctags_handle\close()
                 vim.bo.tags = tagfile
                 vim.cmd("doautocmd User NeotagsCtagsComplete")
@@ -115,7 +118,8 @@ class Neotags
         )
 
         loop.read_start(stdout, (err, data) -> print(data) if data)
-        loop.read_start(stderr, (err, data) -> print(data) if data)
+        if not @opts.ctags.silent
+            loop.read_start(stderr, (err, data) -> print(data) if data)
 
     update: () =>
         return if not @opts.enable

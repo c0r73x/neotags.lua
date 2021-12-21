@@ -6,6 +6,6 @@
         f: { group: 'neotags_FunctionTag' },
         m: { group: 'neotags_MethodTag' },
         o: { group: 'neotags_ObjectTag' },
-        p: { group: 'neotags_PropTag' },
+        p: { group: 'neotags_PreProcTag' },
     }
 }

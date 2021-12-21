@@ -17,7 +17,7 @@ return {
       group = 'neotags_ObjectTag'
     },
     p = {
-      group = 'neotags_PropTag'
+      group = 'neotags_PreProcTag'
     }
   }
 }
