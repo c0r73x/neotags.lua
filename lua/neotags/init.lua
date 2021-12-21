@@ -111,8 +111,11 @@ do
         return callback(files)
       end))
       loop.read_start(stdout, function(err, data)
-        if data then
-          files = Utils.explode('\n', data)
+        if not (data) then
+          return 
+        end
+        for _, file in ipairs(Utils.explode('\n', data)) do
+          table.insert(files, file)
         end
       end)
       return loop.read_start(stderr, function(err, data)
@@ -181,6 +184,7 @@ do
       local keywords = { }
       local prefix = opts.prefix or self.opts.hl.prefix
       local suffix = opts.suffix or self.opts.hl.suffix
+      local added = { }
       for _index_0 = 1, #group do
         local _continue_0 = false
         repeat
@@ -189,7 +193,12 @@ do
             _continue_0 = true
             break
           end
+          if Utils.contains(added, tag.name) then
+            _continue_0 = true
+            break
+          end
           if not content:find(tag.name) then
+            table.insert(added, tag.name)
             _continue_0 = true
             break
           end
@@ -202,6 +211,7 @@ do
               table.insert(matches, tag.name)
             end
           end
+          table.insert(added, tag.name)
           _continue_0 = true
         until true
         if not _continue_0 then
@@ -288,7 +298,6 @@ do
                 _continue_1 = true
                 break
               end
-              print("adding " .. tostring(kinds[kind]) .. " for " .. tostring(lang) .. " in " .. tostring(kind))
               self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
               _continue_1 = true
             until true

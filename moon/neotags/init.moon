@@ -150,7 +150,12 @@ class Neotags
             )
         )
 
-        loop.read_start(stdout, (err, data) -> files = Utils.explode('\n', data) if data)
+        loop.read_start(stdout, (err, data) ->
+            return unless data
+            
+            for _, file in ipairs(Utils.explode('\n', data))
+                table.insert(files, file)
+        )
         loop.read_start(stderr, (err, data) -> print data if data)
 
     run: (func) =>
@@ -207,9 +212,15 @@ class Neotags
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
 
+        added = {}
+
         for tag in *group
             continue if tag.name\match('^__anon.*$')
-            continue if not content\find(tag.name)
+            continue if Utils.contains(added, tag.name)
+
+            if not content\find(tag.name)
+                table.insert(added, tag.name)
+                continue
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\match('%.') and
@@ -217,6 +228,8 @@ class Neotags
                 table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
             else
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
+
+            table.insert(added, tag.name)
 
         coroutine.yield("silent! syntax clear #{hl}")
         coroutine.yield("hi def link #{hl} #{opts.group}")
@@ -270,7 +283,7 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
-                print "adding #{kinds[kind]} for #{lang} in #{kind}"
+                -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
                 @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
 
 export neotags = Neotags! if not neotags
