@@ -14,7 +14,7 @@ do
       end
       vim.cmd([[            augroup NeotagsLua
             autocmd!
-            autocmd Syntax * lua require'neotags'.highlight()
+            autocmd FileType * lua require'neotags'.highlight()
             autocmd BufWritePost * lua require'neotags'.update()
             autocmd User NeotagsCtagsComplete lua require'neotags'.highlight()
             augroup END
@@ -38,7 +38,7 @@ do
         return 
       end
       local stderr
-      if not self.opts.ctags.silent then
+      if self.opts.ctags.verbose then
         stderr = loop.new_pipe(false)
       end
       local stdout = loop.new_pipe(false)
@@ -53,7 +53,7 @@ do
       }, vim.schedule_wrap(function()
         stdout:read_stop()
         stdout:close()
-        if not self.opts.ctags.silent then
+        if self.opts.ctags.verbose then
           stderr:read_stop()
           stderr:close()
         end
@@ -67,7 +67,7 @@ do
           return print(data)
         end
       end)
-      if not self.opts.ctags.silent then
+      if self.opts.ctags.verbose then
         return loop.read_start(stderr, function(err, data)
           if data then
             return print(data)
@@ -184,23 +184,25 @@ do
       end
       self.syntax_groups = { }
     end,
-    makesyntax = function(self, lang, kind, group, opts, content)
+    makesyntax = function(self, lang, kind, group, opts, content, added)
       local hl = "_Neotags_" .. tostring(lang) .. "_" .. tostring(kind) .. "_" .. tostring(opts.group)
       local notin = { }
       local matches = { }
       local keywords = { }
       local prefix = opts.prefix or self.opts.hl.prefix
       local suffix = opts.suffix or self.opts.hl.suffix
-      local added = { }
+      local forbidden = {
+        '*'
+      }
       for _index_0 = 1, #group do
         local _continue_0 = false
         repeat
           local tag = group[_index_0]
-          if tag.name:match('^__anon.*$') then
+          if Utils.contains(added, tag.name) then
             _continue_0 = true
             break
           end
-          if Utils.contains(added, tag.name) then
+          if Utils.contains(forbidden, tag.name) then
             _continue_0 = true
             break
           end
@@ -209,7 +211,7 @@ do
             _continue_0 = true
             break
           end
-          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:match('%.') and not tag.name == contains and not opt.notin) then
+          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:match('%.') and not tag.name == 'contains' and not opt.notin) then
             if not Utils.contains(keywords, tag.name) then
               table.insert(keywords, tag.name)
             end
@@ -252,7 +254,7 @@ do
     end,
     highlight = function(self)
       local ft = vim.bo.filetype
-      if Utils.contains(self.opts.ignore, ft) then
+      if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
         return 
       end
       local bufnr = api.nvim_get_current_buf()
@@ -263,11 +265,27 @@ do
         local _continue_0 = false
         repeat
           local tag = tags[_index_0]
+          if tag.name:match('^[a-zA-Z]$') then
+            _continue_0 = true
+            break
+          end
+          if tag.name:match('^[0-9]+$') then
+            _continue_0 = true
+            break
+          end
+          if tag.name:match('^__anon.*$') then
+            _continue_0 = true
+            break
+          end
           tag.language = tag.language:lower()
           if self.opts.ft_conv[tag.language] then
             tag.language = self.opts.ft_conv[tag.language]
           end
           if self.opts.ft_map[ft] and not Utils.contains(self.opts.ft_map[ft], tag.language) then
+            _continue_0 = true
+            break
+          end
+          if not self.opts.ft_map[ft] and not ft == tag.language then
             _continue_0 = true
             break
           end
@@ -284,7 +302,10 @@ do
           break
         end
       end
-      for lang, kinds in pairs(groups) do
+      local langmap = self.opts.ft_map[ft] or {
+        ft
+      }
+      for _, lang in pairs(langmap) do
         local _continue_0 = false
         repeat
           if not self.languages[lang] or not self.languages[lang].order then
@@ -293,6 +314,8 @@ do
           end
           local cl = self.languages[lang]
           local order = cl.order
+          local added = { }
+          local kinds = groups[lang]
           for i = 1, #order do
             local _continue_1 = false
             repeat
@@ -305,7 +328,7 @@ do
                 _continue_1 = true
                 break
               end
-              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
+              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added)
               _continue_1 = true
             until true
             if not _continue_1 then
@@ -334,6 +357,10 @@ do
           cpp = {
             'cpp',
             'c'
+          },
+          c = {
+            'c',
+            'cpp'
           }
         },
         hl = {
@@ -348,7 +375,7 @@ do
         ctags = {
           run = true,
           directory = vim.fn.expand('~/.vim_tags'),
-          silent = true,
+          verbose = false,
           binary = 'ctags',
           args = {
             '--fields=+l',
@@ -368,7 +395,8 @@ do
           'nofile',
           'readdir',
           'qf',
-          'text'
+          'text',
+          'plaintext'
         },
         notin = {
           '.*String.*',

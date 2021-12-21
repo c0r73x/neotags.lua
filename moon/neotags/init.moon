@@ -14,6 +14,7 @@ class Neotags
             },
             ft_map: {
                 cpp: { 'cpp', 'c' },
+                c: { 'c', 'cpp' },
             },
             hl: {
                 patternlength: 2048,
@@ -27,7 +28,7 @@ class Neotags
             ctags: {
                 run: true,
                 directory: vim.fn.expand('~/.vim_tags'),
-                silent: true,
+                verbose: false,
                 binary: 'ctags'
                 args: {
                     '--fields=+l',
@@ -47,7 +48,8 @@ class Neotags
                 'nofile',
                 'readdir',
                 'qf',
-                'text'
+                'text',
+                'plaintext'
             },
             notin: {
                 '.*String.*',
@@ -72,7 +74,7 @@ class Neotags
         vim.cmd[[
             augroup NeotagsLua
             autocmd!
-            autocmd Syntax * lua require'neotags'.highlight()
+            autocmd FileType * lua require'neotags'.highlight()
             autocmd BufWritePost * lua require'neotags'.update()
             autocmd User NeotagsCtagsComplete lua require'neotags'.highlight()
             augroup END
@@ -93,7 +95,7 @@ class Neotags
 
         return if @ctags_handle
 
-        stderr = loop.new_pipe(false) if not @opts.ctags.silent
+        stderr = loop.new_pipe(false) if @opts.ctags.verbose
         stdout = loop.new_pipe(false)
 
         @ctags_handle = loop.spawn(
@@ -106,7 +108,7 @@ class Neotags
                 stdout\read_stop()
                 stdout\close()
 
-                if not @opts.ctags.silent
+                if @opts.ctags.verbose
                     stderr\read_stop() 
                     stderr\close()
 
@@ -118,7 +120,7 @@ class Neotags
         )
 
         loop.read_start(stdout, (err, data) -> print(data) if data)
-        if not @opts.ctags.silent
+        if @opts.ctags.verbose
             loop.read_start(stderr, (err, data) -> print(data) if data)
 
     update: () =>
@@ -206,7 +208,7 @@ class Neotags
 
         @syntax_groups = {}
 
-    makesyntax: (lang, kind, group, opts, content) =>
+    makesyntax: (lang, kind, group, opts, content, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
         notin = {}
@@ -216,11 +218,13 @@ class Neotags
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
 
-        added = {}
+        forbidden = {
+            '*',
+        }
 
         for tag in *group
-            continue if tag.name\match('^__anon.*$')
             continue if Utils.contains(added, tag.name)
+            continue if Utils.contains(forbidden, tag.name)
 
             if not content\find(tag.name)
                 table.insert(added, tag.name)
@@ -228,7 +232,7 @@ class Neotags
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\match('%.') and
-                    not tag.name == contains and not opt.notin)
+                    not tag.name == 'contains'  and not opt.notin)
                 table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
             else
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
@@ -255,8 +259,7 @@ class Neotags
 
     highlight: () =>
         ft = vim.bo.filetype
-
-        return if Utils.contains(@opts.ignore, ft)
+        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
 
         bufnr = api.nvim_get_current_buf()
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
@@ -265,21 +268,35 @@ class Neotags
         groups = {}
 
         for tag in *tags
+            continue if tag.name\match('^[a-zA-Z]$')
+            continue if tag.name\match('^[0-9]+$')
+            continue if tag.name\match('^__anon.*$')
+
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
 
             if @opts.ft_map[ft] and not Utils.contains(@opts.ft_map[ft], tag.language)
                 continue
 
+            if not @opts.ft_map[ft] and not ft == tag.language
+                continue
+
+            -- if tag.language == 'vim'
+                -- print require'lsp'.format_as_json(tag)
+
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
 
             table.insert(groups[tag.language][tag.kind], tag)
 
-        for lang, kinds in pairs(groups)
+        langmap = @opts.ft_map[ft] or {ft}
+
+        for _, lang in pairs(langmap)
             continue if not @languages[lang] or not @languages[lang].order
             cl = @languages[lang]
             order = cl.order
+            added = {}
+            kinds = groups[lang]
 
             for i = 1, #order
                 kind = order\sub(i, i)
@@ -288,7 +305,7 @@ class Neotags
                 continue if not cl.kinds or not cl.kinds[kind]
 
                 -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added)
 
 export neotags = Neotags! if not neotags
 

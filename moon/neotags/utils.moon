@@ -1,6 +1,9 @@
 class Utils
-    contains: (list, el) ->
-        for _, value in pairs(list)
+    contains: (input, el) ->
+        return false if not input
+        return false if not el
+
+        for _, value in pairs(input)
             return true if value == el
         return false
 

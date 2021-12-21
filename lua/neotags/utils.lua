@@ -2,8 +2,14 @@ local Utils
 do
   local _class_0
   local _base_0 = {
-    contains = function(list, el)
-      for _, value in pairs(list) do
+    contains = function(input, el)
+      if not input then
+        return false
+      end
+      if not el then
+        return false
+      end
+      for _, value in pairs(input) do
         if value == el then
           return true
         end
