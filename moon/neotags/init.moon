@@ -184,6 +184,7 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
+            -- vim.cmd("echo '#{cmd}'")
             vim.cmd(cmd) if cmd
             break if coroutine.status(co) == 'dead'
 
@@ -268,7 +269,7 @@ class Neotags
         groups = {}
 
         for tag in *tags
-            continue if tag.name\match('^[a-zA-Z]$')
+            continue if tag.name\match('^[a-zA-Z]{,2}$')
             continue if tag.name\match('^[0-9]+$')
             continue if tag.name\match('^__anon.*$')
 
@@ -297,6 +298,7 @@ class Neotags
             order = cl.order
             added = {}
             kinds = groups[lang]
+            continue if not kinds
 
             for i = 1, #order
                 kind = order\sub(i, i)

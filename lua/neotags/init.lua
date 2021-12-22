@@ -265,7 +265,7 @@ do
         local _continue_0 = false
         repeat
           local tag = tags[_index_0]
-          if tag.name:match('^[a-zA-Z]$') then
+          if tag.name:match('^[a-zA-Z]{,2}$') then
             _continue_0 = true
             break
           end
@@ -316,6 +316,10 @@ do
           local order = cl.order
           local added = { }
           local kinds = groups[lang]
+          if not kinds then
+            _continue_0 = true
+            break
+          end
           for i = 1, #order do
             local _continue_1 = false
             repeat
