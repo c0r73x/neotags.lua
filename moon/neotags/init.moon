@@ -212,7 +212,6 @@ class Neotags
     makesyntax: (lang, kind, group, opts, content, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
-        notin = {}
         matches = {}
         keywords = {}
 
@@ -244,11 +243,25 @@ class Neotags
         coroutine.yield("hi def link #{hl} #{opts.group}")
 
         table.sort(matches, (a, b) -> a < b)
+        merged = {}
+
+        if opts.extended_notin and opts.extend_notin == false
+            merged = opts.notin or @opts.notin or {}
+        else
+            a = @opts.notin or {}
+            b = opts.notin or {}
+            max = (#a > #b) and #a or #b
+            for i=1,max 
+                merged[#merged+1] = a[i] if a[i]
+                merged[#merged+1] = b[i] if b[i]
+
+        notin = ''
+        notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+
         for i = 1, #matches, @opts.hl.patternlength
             current = {unpack(matches, i, i + @opts.hl.patternlength)}
-            notin = table.concat(opts.notin or @opts.notin, ',')
             str = table.concat(current, '\\|')
-            coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ containedin=ALLBUT,#{notin} display")
+            coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
         table.sort(keywords, (a, b) -> a < b)
         for i = 1, #keywords, @opts.hl.patternlength

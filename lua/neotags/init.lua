@@ -186,7 +186,6 @@ do
     end,
     makesyntax = function(self, lang, kind, group, opts, content, added)
       local hl = "_Neotags_" .. tostring(lang) .. "_" .. tostring(kind) .. "_" .. tostring(opts.group)
-      local notin = { }
       local matches = { }
       local keywords = { }
       local prefix = opts.prefix or self.opts.hl.prefix
@@ -232,13 +231,32 @@ do
       table.sort(matches, function(a, b)
         return a < b
       end)
+      local merged = { }
+      if opts.extended_notin and opts.extend_notin == false then
+        merged = opts.notin or self.opts.notin or { }
+      else
+        local a = self.opts.notin or { }
+        local b = opts.notin or { }
+        local max = (#a > #b) and #a or #b
+        for i = 1, max do
+          if a[i] then
+            merged[#merged + 1] = a[i]
+          end
+          if b[i] then
+            merged[#merged + 1] = b[i]
+          end
+        end
+      end
+      local notin = ''
+      if #merged > 0 then
+        notin = "containedin=ALLBUT," .. tostring(table.concat(merged, ','))
+      end
       for i = 1, #matches, self.opts.hl.patternlength do
         local current = {
           unpack(matches, i, i + self.opts.hl.patternlength)
         }
-        notin = table.concat(opts.notin or self.opts.notin, ',')
         local str = table.concat(current, '\\|')
-        coroutine.yield("syntax match " .. tostring(hl) .. " /" .. tostring(prefix) .. "\\%(" .. tostring(str) .. "\\)" .. tostring(suffix) .. "/ containedin=ALLBUT," .. tostring(notin) .. " display")
+        coroutine.yield("syntax match " .. tostring(hl) .. " /" .. tostring(prefix) .. "\\%(" .. tostring(str) .. "\\)" .. tostring(suffix) .. "/ " .. tostring(notin) .. " display")
       end
       table.sort(keywords, function(a, b)
         return a < b
