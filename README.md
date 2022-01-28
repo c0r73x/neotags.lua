@@ -7,7 +7,6 @@ successor of https://github.com/c0r73x/neotags.nvim
 ```lua
 neotags.setup({
     enable = true, -- enable neotags.lua
-    tagfiles_by_type = false, -- create separate tag files per filetype
     ctags = {
         run = true, -- run ctags
         directory = '~/.vim_tags' -- default directory where to store tags
@@ -95,3 +94,7 @@ return {
   }
 }
 ```
+
+## Toggle neotags
+
+`neotags.toggle()`
