@@ -23,7 +23,6 @@ class Neotags
             },
             tools: {
                 find: nil,
-                regex: nil,
             },
             ctags: {
                 run: true,

@@ -391,8 +391,7 @@ do
           suffix = [[\>]]
         },
         tools = {
-          find = nil,
-          regex = nil
+          find = nil
         },
         ctags = {
           run = true,
