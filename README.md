@@ -2,6 +2,8 @@
 
 successor of https://github.com/c0r73x/neotags.nvim
 
+![ScreenShot](/screenshot.gif?raw=true)
+
 ## Default Configuration
 
 ```lua
