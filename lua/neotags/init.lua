@@ -27,6 +27,9 @@ do
       return tostring(self.opts.ctags.directory) .. "/" .. tostring(path) .. ".tags"
     end,
     runCtags = function(self, files)
+      if self.ctags_handle then
+        return 
+      end
       local tagfile = self:currentTagfile()
       local args = self.opts.ctags.args
       args = Utils.concat(args, {
@@ -34,9 +37,6 @@ do
         tagfile
       })
       args = Utils.concat(args, files)
-      if self.ctags_handle then
-        return 
-      end
       local stderr
       if self.opts.ctags.verbose then
         stderr = loop.new_pipe(false)

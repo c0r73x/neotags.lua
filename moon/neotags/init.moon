@@ -87,12 +87,12 @@ class Neotags
         return "#{@opts.ctags.directory}/#{path}.tags"
 
     runCtags: (files) =>
+        return if @ctags_handle
+
         tagfile = @currentTagfile()
         args = @opts.ctags.args
         args = Utils.concat(args, { '-f', tagfile })
         args = Utils.concat(args, files)
-
-        return if @ctags_handle
 
         stderr = loop.new_pipe(false) if @opts.ctags.verbose
         stdout = loop.new_pipe(false)
