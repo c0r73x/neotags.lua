@@ -283,8 +283,9 @@ do
         local _continue_0 = false
         repeat
           local tag = tags[_index_0]
-          if tag.language then
-            return 
+          if not tag.language then
+            _continue_0 = true
+            break
           end
           if tag.name:match('^[a-zA-Z]{,2}$') then
             _continue_0 = true

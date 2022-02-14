@@ -281,8 +281,7 @@ class Neotags
         groups = {}
 
         for tag in *tags
-            return if tag.language
-
+            continue if not tag.language
             continue if tag.name\match('^[a-zA-Z]{,2}$')
             continue if tag.name\match('^[0-9]+$')
             continue if tag.name\match('^__anon.*$')
