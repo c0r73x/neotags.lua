@@ -12,13 +12,26 @@ do
       if not self.opts.enable then
         return 
       end
-      vim.cmd([[            augroup NeotagsLua
-            autocmd!
-            autocmd FileType * lua require'neotags'.highlight()
-            autocmd BufWritePost * lua require'neotags'.update()
-            autocmd User NeotagsCtagsComplete lua require'neotags'.highlight()
-            augroup END
-        ]])
+      vim.api.nvim_create_augroup('NeotagsLua', {
+        clear = true
+      })
+      vim.api.nvim_create_autocmd({
+        'FileType',
+        'User NeotagsCtagsComplete'
+      }, {
+        group = 'NeotagsLua',
+        pattern = '*',
+        callback = function()
+          return require('neotags').highlight()
+        end
+      })
+      vim.api.nvim_create_autocmd('BufWritePost', {
+        group = 'NeotagsLua',
+        pattern = '*',
+        callback = function()
+          return require('neotags').update()
+        end
+      })
       return self:run('highlight')
     end,
     currentTagfile = function(self)

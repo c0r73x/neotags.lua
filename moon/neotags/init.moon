@@ -70,14 +70,23 @@ class Neotags
         @opts = vim.tbl_deep_extend('force', @opts, opts) if opts
         return if not @opts.enable
 
-        vim.cmd[[
-            augroup NeotagsLua
-            autocmd!
-            autocmd FileType * lua require'neotags'.highlight()
-            autocmd BufWritePost * lua require'neotags'.update()
-            autocmd User NeotagsCtagsComplete lua require'neotags'.highlight()
-            augroup END
-        ]]
+        vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
+        vim.api.nvim_create_autocmd(
+            { 'FileType', 'User NeotagsCtagsComplete' }
+            {
+                group: 'NeotagsLua',
+                pattern: '*',
+                callback: () -> require'neotags'.highlight()
+            }
+        )
+        vim.api.nvim_create_autocmd(
+            'BufWritePost',
+            {
+                group: 'NeotagsLua',
+                pattern: '*',
+                callback: () -> require'neotags'.update()
+            }
+        )
 
         @run('highlight')
 
