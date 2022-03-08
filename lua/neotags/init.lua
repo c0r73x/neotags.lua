@@ -92,6 +92,10 @@ do
       if not self.opts.enable then
         return 
       end
+      local ft = vim.bo.filetype
+      if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
+        return 
+      end
       return self:findFiles(function(files)
         return self:runCtags(files)
       end)
@@ -145,6 +149,10 @@ do
       end)
     end,
     run = function(self, func)
+      local ft = vim.bo.filetype
+      if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
+        return 
+      end
       local co = nil
       local _exp_0 = func
       if 'highlight' == _exp_0 then

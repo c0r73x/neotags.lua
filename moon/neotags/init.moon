@@ -134,6 +134,10 @@ class Neotags
 
     update: () =>
         return if not @opts.enable
+
+        ft = vim.bo.filetype
+        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
+
         @findFiles((files) -> @runCtags(files))
 
     findFiles: (callback) =>
@@ -174,6 +178,9 @@ class Neotags
         loop.read_start(stderr, (err, data) -> print data if data)
 
     run: (func) =>
+        ft = vim.bo.filetype
+        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
+
         co = nil
 
         switch func
