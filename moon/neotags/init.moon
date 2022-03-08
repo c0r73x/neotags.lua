@@ -275,7 +275,7 @@ class Neotags
         for i = 1, #keywords, @opts.hl.patternlength
             current = {unpack(keywords, i, i + @opts.hl.patternlength)}
             str = table.concat(current, ' ')
-            coroutine.yield("syntax keyword #{hl} #{str} display")
+            coroutine.yield("syntax keyword #{hl} #{str} #{notin} display")
 
         table.insert(@syntax_groups, hl)
 

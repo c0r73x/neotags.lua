@@ -279,7 +279,7 @@ do
           unpack(keywords, i, i + self.opts.hl.patternlength)
         }
         local str = table.concat(current, ' ')
-        coroutine.yield("syntax keyword " .. tostring(hl) .. " " .. tostring(str) .. " display")
+        coroutine.yield("syntax keyword " .. tostring(hl) .. " " .. tostring(str) .. " " .. tostring(notin) .. " display")
       end
       return table.insert(self.syntax_groups, hl)
     end,
