@@ -203,6 +203,7 @@ do
       local keywords = { }
       local prefix = opts.prefix or self.opts.hl.prefix
       local suffix = opts.suffix or self.opts.hl.suffix
+      local minlen = opts.minlen or self.opts.hl.minlen
       local forbidden = {
         '*'
       }
@@ -210,6 +211,10 @@ do
         local _continue_0 = false
         repeat
           local tag = group[_index_0]
+          if #tag.name < minlen then
+            _continue_0 = true
+            break
+          end
           if Utils.contains(added, tag.name) then
             _continue_0 = true
             break
@@ -387,6 +392,7 @@ do
     __init = function(self, opts)
       self.opts = {
         enable = true,
+        minlen = 3,
         ft_conv = {
           ['c++'] = 'cpp',
           ['moonscript'] = 'moon',

@@ -32,6 +32,7 @@ neotags.setup({
         c = { 'c', 'cpp' }
     },
     hl = {
+        minlen = 3, -- dont include tags shorter than this
         patternlength = 2048, -- max syntax length when splitting it into chunks
         prefix = [[\C\<]], -- default syntax prefix
         suffix = [[\>]] -- default syntax suffix
@@ -84,6 +85,7 @@ return {
     g = {
       group = 'neotags_EnumTypeTag', -- highlight
       prefix = [[\%(enum\s\+\)\@5<=]] -- override default prefix
+      minlen = 2, -- dont include tags shorter than this
     },
     ...
     t = {

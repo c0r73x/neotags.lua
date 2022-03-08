@@ -7,6 +7,7 @@ class Neotags
     new: (opts) =>
         @opts = {
             enable: true,
+            minlen: 3,
             ft_conv: {
                 ['c++']: 'cpp',
                 ['moonscript']: 'moon',
@@ -225,12 +226,14 @@ class Neotags
 
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
+        minlen = opts.minlen or @opts.hl.minlen
 
         forbidden = {
             '*',
         }
 
         for tag in *group
+            continue if #tag.name < minlen
             continue if Utils.contains(added, tag.name)
             continue if Utils.contains(forbidden, tag.name)
 
