@@ -240,7 +240,7 @@ class Neotags
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\find('.', 1, true) and
-                    not tag.name == 'contains' and not opts.notin)
+                    tag.name != 'contains')
                 table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
             else
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
@@ -275,7 +275,7 @@ class Neotags
         for i = 1, #keywords, @opts.hl.patternlength
             current = {unpack(keywords, i, i + @opts.hl.patternlength)}
             str = table.concat(current, ' ')
-            coroutine.yield("syntax keyword #{hl} #{str}")
+            coroutine.yield("syntax keyword #{hl} #{str} display")
 
         table.insert(@syntax_groups, hl)
 

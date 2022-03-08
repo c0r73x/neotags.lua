@@ -223,7 +223,7 @@ do
             _continue_0 = true
             break
           end
-          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:find('.', 1, true) and not tag.name == 'contains' and not opts.notin) then
+          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:find('.', 1, true) and tag.name ~= 'contains') then
             if not Utils.contains(keywords, tag.name) then
               table.insert(keywords, tag.name)
             end
@@ -279,7 +279,7 @@ do
           unpack(keywords, i, i + self.opts.hl.patternlength)
         }
         local str = table.concat(current, ' ')
-        coroutine.yield("syntax keyword " .. tostring(hl) .. " " .. tostring(str))
+        coroutine.yield("syntax keyword " .. tostring(hl) .. " " .. tostring(str) .. " display")
       end
       return table.insert(self.syntax_groups, hl)
     end,
