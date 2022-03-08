@@ -239,8 +239,8 @@ class Neotags
                 continue
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
-                    opts.allow_keyword != false and not tag.name\match('%.') and
-                    not tag.name == 'contains'  and not opt.notin)
+                    opts.allow_keyword != false and not tag.name\find('.', 1, true) and
+                    not tag.name == 'contains' and not opts.notin)
                 table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
             else
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)

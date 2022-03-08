@@ -223,7 +223,7 @@ do
             _continue_0 = true
             break
           end
-          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:match('%.') and not tag.name == 'contains' and not opt.notin) then
+          if (prefix == self.opts.hl.prefix and suffix == self.opts.hl.suffix and opts.allow_keyword ~= false and not tag.name:find('.', 1, true) and not tag.name == 'contains' and not opts.notin) then
             if not Utils.contains(keywords, tag.name) then
               table.insert(keywords, tag.name)
             end
