@@ -392,7 +392,6 @@ do
     __init = function(self, opts)
       self.opts = {
         enable = true,
-        minlen = 3,
         ft_conv = {
           ['c++'] = 'cpp',
           ['moonscript'] = 'moon',
@@ -409,6 +408,7 @@ do
           }
         },
         hl = {
+          minlen = 3,
           patternlength = 2048,
           prefix = [[\C\<]],
           suffix = [[\>]]

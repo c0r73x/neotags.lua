@@ -7,7 +7,6 @@ class Neotags
     new: (opts) =>
         @opts = {
             enable: true,
-            minlen: 3,
             ft_conv: {
                 ['c++']: 'cpp',
                 ['moonscript']: 'moon',
@@ -18,6 +17,7 @@ class Neotags
                 c: { 'c', 'cpp' },
             },
             hl: {
+                minlen: 3,
                 patternlength: 2048,
                 prefix: [[\C\<]],
                 suffix: [[\>]],
