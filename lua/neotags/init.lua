@@ -15,24 +15,18 @@ do
       vim.api.nvim_create_augroup('NeotagsLua', {
         clear = true
       })
-      vim.api.nvim_create_autocmd({
-        'FileType',
-        'User NeotagsCtagsComplete'
-      }, {
+      vim.api.nvim_create_autocmd('BufReadPre', {
         group = 'NeotagsLua',
-        pattern = '*',
         callback = function()
           return require('neotags').highlight()
         end
       })
-      vim.api.nvim_create_autocmd('BufWritePost', {
+      return vim.api.nvim_create_autocmd('BufWritePost', {
         group = 'NeotagsLua',
-        pattern = '*',
         callback = function()
           return require('neotags').update()
         end
       })
-      return self:run('highlight')
     end,
     currentTagfile = function(self)
       local path = vim.fn.getcwd()
@@ -50,43 +44,38 @@ do
         tagfile
       })
       args = Utils.concat(args, files)
-      local stderr
-      if self.opts.ctags.verbose then
-        stderr = loop.new_pipe(false)
-      end
-      local stdout = loop.new_pipe(false)
-      self.ctags_handle = loop.spawn(self.opts.ctags.binary, {
-        args = args,
-        cwd = vim.fn.getcwd(),
-        stdio = {
-          nil,
-          stdout,
-          stderr
-        }
-      }, vim.schedule_wrap(function()
-        stdout:read_stop()
-        stdout:close()
-        if self.opts.ctags.verbose then
-          stderr:read_stop()
-          stderr:close()
-        end
-        self.ctags_handle:close()
-        vim.bo.tags = tagfile
-        vim.cmd("doautocmd User NeotagsCtagsComplete")
-        self.ctags_handle = nil
-      end))
-      loop.read_start(stdout, function(err, data)
-        if data then
-          return print(data)
-        end
-      end)
-      if self.opts.ctags.verbose then
-        return loop.read_start(stderr, function(err, data)
-          if data then
-            return print(data)
+      local cmd = Utils.concat({
+        self.opts.ctags.binary
+      }, args)
+      self.ctags_handle = vim.fn.jobstart(cmd, {
+        on_stdout = function(job_id, data, event)
+          if not (data) then
+            return 
           end
-        end)
-      end
+          if not (self.opts.ctags.verbose) then
+            return 
+          end
+          for _, output in ipairs(data) do
+            print(output)
+          end
+        end,
+        on_stderr = function(job_id, data, event)
+          if not (data) then
+            return 
+          end
+          if not (self.opts.ctags.verbose) then
+            return 
+          end
+          for _, output in ipairs(data) do
+            print(output)
+          end
+        end,
+        on_exit = function(job_id, data, event)
+          return vim.api.nvim_do_autocmd('NeotagsCtagsComplete', {
+            group = 'NeotagsLua'
+          })
+        end
+      })
     end,
     update = function(self)
       if not self.opts.enable then
@@ -111,42 +100,37 @@ do
       if self.find_handle then
         return 
       end
-      local stdout = loop.new_pipe(false)
-      local stderr = loop.new_pipe(false)
       local files = { }
       local args = Utils.concat(self.opts.tools.find.args, {
         path
       })
-      self.find_handle = loop.spawn(self.opts.tools.find.binary, {
-        args = args,
-        cwd = path,
-        stdio = {
-          nil,
-          stdout,
-          stderr
-        }
-      }, vim.schedule_wrap(function()
-        stdout:read_stop()
-        stdout:close()
-        stderr:read_stop()
-        stderr:close()
-        self.find_handle:close()
-        self.find_handle = nil
-        return callback(files)
-      end))
-      loop.read_start(stdout, function(err, data)
-        if not (data) then
-          return 
+      local cmd = Utils.concat({
+        self.opts.tools.find.binary
+      }, args)
+      self.find_handle = vim.fn.jobstart(cmd, {
+        on_stdout = function(job_id, data, event)
+          if not (data) then
+            return 
+          end
+          for _, file in ipairs(data) do
+            table.insert(files, file)
+          end
+        end,
+        on_stderr = function(job_id, data, event)
+          if not (data) then
+            return 
+          end
+          if not (self.opts.ctags.verbose) then
+            return 
+          end
+          for _, output in ipairs(data) do
+            print(output)
+          end
+        end,
+        on_exit = function(job_id, data, event)
+          return callback(files)
         end
-        for _, file in ipairs(Utils.explode('\n', data)) do
-          table.insert(files, file)
-        end
-      end)
-      return loop.read_start(stderr, function(err, data)
-        if data then
-          return print(data)
-        end
-      end)
+      })
     end,
     run = function(self, func)
       local ft = vim.bo.filetype
@@ -169,6 +153,8 @@ do
         co = coroutine.create(function()
           return self:clearsyntax()
         end)
+      else
+        return 
       end
       if not co then
         return 
@@ -196,10 +182,9 @@ do
       self.languages[lang] = opts
     end,
     clearsyntax = function(self)
-      vim.cmd([[            augroup NeotagsLua
-            autocmd!
-            augroup END
-        ]])
+      vim.api.nvim_create_augroup('NeotagsLua', {
+        clear = true
+      })
       for _, hl in pairs(self.syntax_groups) do
         coroutine.yield("silent! syntax clear " .. tostring(hl))
       end
@@ -297,10 +282,14 @@ do
       return table.insert(self.syntax_groups, hl)
     end,
     highlight = function(self)
+      if self.highlighting then
+        return 
+      end
       local ft = vim.bo.filetype
       if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
         return 
       end
+      self.highlighting = true
       local bufnr = api.nvim_get_current_buf()
       local content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
       local tags = vim.fn.taglist('.*')
@@ -393,6 +382,7 @@ do
           break
         end
       end
+      self.highlighting = false
     end
   }
   _base_0.__index = _base_0
@@ -433,8 +423,7 @@ do
             '--fields=+l',
             '--c-kinds=+p',
             '--c++-kinds=+p',
-            '--sort=no',
-            '-a'
+            '--sort=no'
           }
         },
         ignore = {
@@ -463,6 +452,7 @@ do
       }
       self.languages = { }
       self.syntax_groups = { }
+      self.highlighting = false
       self.ctags_handle = nil
       self.find_handle = nil
     end,

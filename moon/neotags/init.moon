@@ -35,7 +35,6 @@ class Neotags
                     '--c-kinds=+p',
                     '--c++-kinds=+p',
                     '--sort=no',
-                    '-a',
                 },
             },
             ignore: {
@@ -64,6 +63,7 @@ class Neotags
         }
         @languages = {}
         @syntax_groups = {}
+        @highlighting = false
         @ctags_handle = nil
         @find_handle = nil
 
@@ -73,10 +73,9 @@ class Neotags
 
         vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
-            { 'FileType', 'User NeotagsCtagsComplete' }
+            'BufReadPre',
             {
                 group: 'NeotagsLua',
-                pattern: '*',
                 callback: () -> require'neotags'.highlight()
             }
         )
@@ -84,12 +83,9 @@ class Neotags
             'BufWritePost',
             {
                 group: 'NeotagsLua',
-                pattern: '*',
                 callback: () -> require'neotags'.update()
             }
         )
-
-        @run('highlight')
 
     currentTagfile: () =>
         path = vim.fn.getcwd()
@@ -104,33 +100,24 @@ class Neotags
         args = Utils.concat(args, { '-f', tagfile })
         args = Utils.concat(args, files)
 
-        stderr = loop.new_pipe(false) if @opts.ctags.verbose
-        stdout = loop.new_pipe(false)
+        cmd = Utils.concat({ @opts.ctags.binary }, args)
 
-        @ctags_handle = loop.spawn(
-            @opts.ctags.binary, {
-                args: args,
-                cwd: vim.fn.getcwd(),
-                stdio: {nil, stdout, stderr},
-            },
-            vim.schedule_wrap(() ->
-                stdout\read_stop()
-                stdout\close()
+        @ctags_handle = vim.fn.jobstart(cmd, {
+                on_stdout: (job_id, data, event) ->
+                    return unless data
+                    return unless @opts.ctags.verbose
 
-                if @opts.ctags.verbose
-                    stderr\read_stop() 
-                    stderr\close()
-
-                @ctags_handle\close()
-                vim.bo.tags = tagfile
-                vim.cmd("doautocmd User NeotagsCtagsComplete")
-                @ctags_handle = nil
-            )
-        )
-
-        loop.read_start(stdout, (err, data) -> print(data) if data)
-        if @opts.ctags.verbose
-            loop.read_start(stderr, (err, data) -> print(data) if data)
+                    print output for _, output in ipairs(data)
+                on_stderr: (job_id, data, event) ->
+                    return unless data
+                    return unless @opts.ctags.verbose
+                    
+                    print output for _, output in ipairs(data)
+                on_exit: (job_id, data, event) ->
+                    vim.api.nvim_do_autocmd('NeotagsCtagsComplete', {
+                        group: 'NeotagsLua',
+                    })
+            })
 
     update: () =>
         return if not @opts.enable
@@ -146,36 +133,25 @@ class Neotags
         return callback({ '-R', path }) if not @opts.tools.find
         return if @find_handle
 
-        stdout = loop.new_pipe(false)
-        stderr = loop.new_pipe(false)
         files = {}
+
         args = Utils.concat(@opts.tools.find.args, { path })
+        cmd = Utils.concat({ @opts.tools.find.binary }, args)
 
-        @find_handle = loop.spawn(
-            @opts.tools.find.binary, {
-                args: args,
-                cwd: path,
-                stdio: {nil, stdout, stderr},
-            },
-            vim.schedule_wrap(() ->
-                stdout\read_stop()
-                stdout\close()
-                stderr\read_stop()
-                stderr\close()
-                @find_handle\close()
-                @find_handle = nil
+        @find_handle = vim.fn.jobstart(cmd, {
+                on_stdout: (job_id, data, event) ->
+                    return unless data
 
-                callback(files)
-            )
-        )
-
-        loop.read_start(stdout, (err, data) ->
-            return unless data
-            
-            for _, file in ipairs(Utils.explode('\n', data))
-                table.insert(files, file)
-        )
-        loop.read_start(stderr, (err, data) -> print data if data)
+                    for _, file in ipairs(data)
+                        table.insert(files, file)
+                on_stderr: (job_id, data, event) ->
+                    return unless data
+                    return unless @opts.ctags.verbose
+                    
+                    print output for _, output in ipairs(data)
+                on_exit: (job_id, data, event) ->
+                    callback(files)
+            })
 
     run: (func) =>
         ft = vim.bo.filetype
@@ -195,6 +171,7 @@ class Neotags
                 co = coroutine.create(() -> @highlight())
             when 'clear'
                 co = coroutine.create(() -> @clearsyntax())
+            else return
 
         return if not co
 
@@ -214,11 +191,7 @@ class Neotags
         @languages[lang] = opts
 
     clearsyntax: () =>
-        vim.cmd[[
-            augroup NeotagsLua
-            autocmd!
-            augroup END
-        ]]
+        vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
 
         for _, hl in pairs(@syntax_groups)
             coroutine.yield("silent! syntax clear #{hl}")
@@ -290,8 +263,12 @@ class Neotags
         table.insert(@syntax_groups, hl)
 
     highlight: () =>
+        return if @highlighting
+
         ft = vim.bo.filetype
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
+
+        @highlighting = true
 
         bufnr = api.nvim_get_current_buf()
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
@@ -340,6 +317,8 @@ class Neotags
 
                 -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
                 @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added)
+
+        @highlighting = false
 
 export neotags = Neotags! if not neotags
 
