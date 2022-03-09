@@ -71,14 +71,13 @@ do
           end
         end,
         on_exit = function(job_id, data, event)
-          return vim.api.nvim_do_autocmd('NeotagsCtagsComplete', {
-            group = 'NeotagsLua'
-          })
+          self.ctags_handle = nil
+          return self:run('highlight')
         end
       })
     end,
     update = function(self)
-      if not self.opts.enable then
+      if not (self.opts.enable) then
         return 
       end
       local ft = vim.bo.filetype
@@ -113,7 +112,9 @@ do
             return 
           end
           for _, file in ipairs(data) do
-            table.insert(files, file)
+            if #file > 0 then
+              table.insert(files, file)
+            end
           end
         end,
         on_stderr = function(job_id, data, event)
@@ -128,6 +129,7 @@ do
           end
         end,
         on_exit = function(job_id, data, event)
+          self.find_handle = nil
           return callback(files)
         end
       })

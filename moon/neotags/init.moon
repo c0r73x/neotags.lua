@@ -114,13 +114,12 @@ class Neotags
                     
                     print output for _, output in ipairs(data)
                 on_exit: (job_id, data, event) ->
-                    vim.api.nvim_do_autocmd('NeotagsCtagsComplete', {
-                        group: 'NeotagsLua',
-                    })
+                    @ctags_handle = nil
+                    @run('highlight')
             })
 
     update: () =>
-        return if not @opts.enable
+        return unless @opts.enable
 
         ft = vim.bo.filetype
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
@@ -143,13 +142,14 @@ class Neotags
                     return unless data
 
                     for _, file in ipairs(data)
-                        table.insert(files, file)
+                        table.insert(files, file) if #file > 0
                 on_stderr: (job_id, data, event) ->
                     return unless data
                     return unless @opts.ctags.verbose
-                    
+
                     print output for _, output in ipairs(data)
                 on_exit: (job_id, data, event) ->
+                    @find_handle = nil
                     callback(files)
             })
 
