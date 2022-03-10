@@ -44,37 +44,46 @@ do
         tagfile
       })
       args = Utils.concat(args, files)
-      local cmd = Utils.concat({
-        self.opts.ctags.binary
-      }, args)
-      self.ctags_handle = vim.fn.jobstart(cmd, {
-        on_stdout = function(job_id, data, event)
-          if not (data) then
-            return 
-          end
-          if not (self.opts.ctags.verbose) then
-            return 
-          end
-          for _, output in ipairs(data) do
-            print(output)
-          end
-        end,
-        on_stderr = function(job_id, data, event)
-          if not (data) then
-            return 
-          end
-          if not (self.opts.ctags.verbose) then
-            return 
-          end
-          for _, output in ipairs(data) do
-            print(output)
-          end
-        end,
-        on_exit = function(job_id, data, event)
-          self.ctags_handle = nil
-          return self:run('highlight')
+      local stdout
+      if self.opts.ctags.verbose then
+        stdout = loop.new_pipe(false)
+      end
+      local stderr
+      if self.opts.ctags.verbose then
+        stderr = loop.new_pipe(false)
+      end
+      self.ctags_handle = loop.spawn(self.opts.ctags.binary, {
+        args = args,
+        cwd = vim.fn.getcwd(),
+        stdio = {
+          nil,
+          stdout,
+          stderr
+        }
+      }, vim.schedule_wrap(function()
+        if self.opts.ctags.verbose then
+          stdout:read_stop()
+          stdout:close()
+          stderr:read_stop()
+          stderr:close()
         end
-      })
+        self.ctags_handle:close()
+        self.ctags_handle = nil
+        vim.bo.tags = tagfile
+        return self:run('highlight')
+      end))
+      if self.opts.ctags.verbose then
+        loop.read_start(stdout, function(err, data)
+          if data then
+            return print(data)
+          end
+        end)
+        return loop.read_start(stderr, function(err, data)
+          if data then
+            return print(data)
+          end
+        end)
+      end
     end,
     update = function(self)
       if not (self.opts.enable) then
@@ -99,40 +108,49 @@ do
       if self.find_handle then
         return 
       end
+      local stdout = loop.new_pipe(false)
+      local stderr
+      if self.opts.ctags.verbose then
+        stderr = loop.new_pipe(false)
+      end
       local files = { }
       local args = Utils.concat(self.opts.tools.find.args, {
         path
       })
-      local cmd = Utils.concat({
-        self.opts.tools.find.binary
-      }, args)
-      self.find_handle = vim.fn.jobstart(cmd, {
-        on_stdout = function(job_id, data, event)
-          if not (data) then
-            return 
-          end
-          for _, file in ipairs(data) do
-            if #file > 0 then
-              table.insert(files, file)
-            end
-          end
-        end,
-        on_stderr = function(job_id, data, event)
-          if not (data) then
-            return 
-          end
-          if not (self.opts.ctags.verbose) then
-            return 
-          end
-          for _, output in ipairs(data) do
-            print(output)
-          end
-        end,
-        on_exit = function(job_id, data, event)
-          self.find_handle = nil
-          return callback(files)
+      self.find_handle = loop.spawn(self.opts.tools.find.binary, {
+        args = args,
+        cwd = path,
+        stdio = {
+          nil,
+          stdout,
+          stderr
+        }
+      }, vim.schedule_wrap(function()
+        stdout:read_stop()
+        stdout:close()
+        if self.opts.ctags.verbose then
+          stderr:read_stop()
+          stderr:close()
         end
-      })
+        self.find_handle:close()
+        self.find_handle = nil
+        return callback(files)
+      end))
+      loop.read_start(stdout, function(err, data)
+        if not (data) then
+          return 
+        end
+        for _, file in ipairs(Utils.explode('\n', data)) do
+          table.insert(files, file)
+        end
+      end)
+      if self.opts.ctags.verbose then
+        return loop.read_start(stderr, function(err, data)
+          if data then
+            return print(data)
+          end
+        end)
+      end
     end,
     run = function(self, func)
       local ft = vim.bo.filetype

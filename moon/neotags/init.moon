@@ -100,23 +100,35 @@ class Neotags
         args = Utils.concat(args, { '-f', tagfile })
         args = Utils.concat(args, files)
 
-        cmd = Utils.concat({ @opts.ctags.binary }, args)
+        stdout = loop.new_pipe(false) if @opts.ctags.verbose
+        stderr = loop.new_pipe(false) if @opts.ctags.verbose
 
-        @ctags_handle = vim.fn.jobstart(cmd, {
-                on_stdout: (job_id, data, event) ->
-                    return unless data
-                    return unless @opts.ctags.verbose
+        @ctags_handle = loop.spawn(
+             @opts.ctags.binary, {
+                args: args,
+                cwd: vim.fn.getcwd(),
+                stdio: {nil, stdout, stderr},
+            },
+            vim.schedule_wrap(() ->
+                if @opts.ctags.verbose
+                    stdout\read_stop()
+                    stdout\close()
 
-                    print output for _, output in ipairs(data)
-                on_stderr: (job_id, data, event) ->
-                    return unless data
-                    return unless @opts.ctags.verbose
-                    
-                    print output for _, output in ipairs(data)
-                on_exit: (job_id, data, event) ->
-                    @ctags_handle = nil
-                    @run('highlight')
-            })
+                    stderr\read_stop()
+                    stderr\close()
+
+                @ctags_handle\close()
+                @ctags_handle = nil
+
+                vim.bo.tags = tagfile
+
+                @run('highlight')
+            )
+        )
+
+        if @opts.ctags.verbose
+            loop.read_start(stdout, (err, data) -> print data if data)
+            loop.read_start(stderr, (err, data) -> print data if data)
 
     update: () =>
         return unless @opts.enable
@@ -132,26 +144,40 @@ class Neotags
         return callback({ '-R', path }) if not @opts.tools.find
         return if @find_handle
 
+        stdout = loop.new_pipe(false)
+        stderr = loop.new_pipe(false) if @opts.ctags.verbose
+
         files = {}
-
         args = Utils.concat(@opts.tools.find.args, { path })
-        cmd = Utils.concat({ @opts.tools.find.binary }, args)
+        @find_handle = loop.spawn(
+            @opts.tools.find.binary, {
+                args: args,
+                cwd: path,
+                stdio: {nil, stdout, stderr},
+            },
+            vim.schedule_wrap(() ->
+                stdout\read_stop()
+                stdout\close()
 
-        @find_handle = vim.fn.jobstart(cmd, {
-                on_stdout: (job_id, data, event) ->
-                    return unless data
+                if @opts.ctags.verbose
+                    stderr\read_stop()
+                    stderr\close()
 
-                    for _, file in ipairs(data)
-                        table.insert(files, file) if #file > 0
-                on_stderr: (job_id, data, event) ->
-                    return unless data
-                    return unless @opts.ctags.verbose
+                @find_handle\close()
+                @find_handle = nil
+                callback(files)
+            )
+        )
 
-                    print output for _, output in ipairs(data)
-                on_exit: (job_id, data, event) ->
-                    @find_handle = nil
-                    callback(files)
-            })
+        loop.read_start(stdout, (err, data) ->
+            return unless data
+
+            for _, file in ipairs(Utils.explode('\n', data))
+                table.insert(files, file)
+        )
+
+        if @opts.ctags.verbose
+            loop.read_start(stderr, (err, data) -> print data if data)
 
     run: (func) =>
         ft = vim.bo.filetype
