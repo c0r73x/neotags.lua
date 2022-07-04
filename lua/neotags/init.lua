@@ -257,8 +257,9 @@ do
           break
         end
       end
-      coroutine.yield("silent! syntax clear " .. tostring(hl))
-      coroutine.yield("hi def link " .. tostring(hl) .. " " .. tostring(opts.group))
+      vim.api.nvim_set_hl(0, hl, {
+        link = opts.group
+      })
       table.sort(matches, function(a, b)
         return a < b
       end)

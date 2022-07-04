@@ -190,7 +190,7 @@ class Neotags
                 tagfile = @currentTagfile()
 
                 if vim.fn.filereadable(tagfile) == 0
-                    @update() 
+                    @update()
                 elseif vim.bo.tags != tagfile
                     vim.bo.tags = tagfile
 
@@ -256,8 +256,7 @@ class Neotags
 
             table.insert(added, tag.name)
 
-        coroutine.yield("silent! syntax clear #{hl}")
-        coroutine.yield("hi def link #{hl} #{opts.group}")
+        vim.api.nvim_set_hl(0, hl, { link: opts.group })
 
         table.sort(matches, (a, b) -> a < b)
         merged = {}
@@ -268,7 +267,7 @@ class Neotags
             a = @opts.notin or {}
             b = opts.notin or {}
             max = (#a > #b) and #a or #b
-            for i=1,max 
+            for i=1,max
                 merged[#merged+1] = a[i] if a[i]
                 merged[#merged+1] = b[i] if b[i]
 
