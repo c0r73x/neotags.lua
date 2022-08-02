@@ -203,8 +203,7 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            -- vim.cmd("echo '#{cmd}'")
-            vim.cmd(cmd) if cmd
+            vim.cmd(cmd) if cmd and not cmd\match('Vim:E%d+')
             break if coroutine.status(co) == 'dead'
 
     toggle: () =>

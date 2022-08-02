@@ -181,7 +181,7 @@ do
       end
       while true do
         local _, cmd = coroutine.resume(co)
-        if cmd then
+        if cmd and not cmd:match('Vim:E%d+') then
           vim.cmd(cmd)
         end
         if coroutine.status(co) == 'dead' then
