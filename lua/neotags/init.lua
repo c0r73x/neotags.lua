@@ -28,6 +28,10 @@ do
         end
       })
     end,
+    restart = function(self)
+      self:setup()
+      return self:run('highlight')
+    end,
     currentTagfile = function(self)
       local path = vim.fn.getcwd()
       path = path:gsub('[%.%/]', '__')
@@ -192,7 +196,7 @@ do
     toggle = function(self)
       self.opts.enable = not self.opts.enable
       if self.opts.enable then
-        self:setup()
+        self:restart()
       end
       if not self.opts.enable then
         return self:run('clear')

@@ -87,6 +87,10 @@ class Neotags
             }
         )
 
+    restart: () =>
+        @setup()
+        @run('highlight')
+
     currentTagfile: () =>
         path = vim.fn.getcwd()
         path = path\gsub('[%.%/]', '__')
@@ -209,7 +213,7 @@ class Neotags
     toggle: () =>
         @opts.enable = not @opts.enable
 
-        @setup() if @opts.enable
+        @restart() if @opts.enable
         @run('clear') if not @opts.enable
 
     language: (lang, opts) =>
