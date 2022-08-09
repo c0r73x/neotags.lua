@@ -15,7 +15,7 @@ do
       vim.api.nvim_create_augroup('NeotagsLua', {
         clear = true
       })
-      vim.api.nvim_create_autocmd('BufReadPost', {
+      vim.api.nvim_create_autocmd('Syntax', {
         group = 'NeotagsLua',
         callback = function()
           return require('neotags').highlight()

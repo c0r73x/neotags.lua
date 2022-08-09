@@ -73,7 +73,7 @@ class Neotags
 
         vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
-            'BufReadPost',
+            'Syntax',
             {
                 group: 'NeotagsLua',
                 callback: () -> require'neotags'.highlight()
