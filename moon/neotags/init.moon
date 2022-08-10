@@ -313,10 +313,10 @@ class Neotags
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
 
-            if @opts.ft_map[ft] and not Utils.contains(@opts.ft_map[ft], tag.language)
+            if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
                 continue
 
-            if not @opts.ft_map[ft] and not ft == tag.language
+            if @opts.ft_map[ft] == nil and ft != tag.language
                 continue
 
             -- if tag.language == 'vim'

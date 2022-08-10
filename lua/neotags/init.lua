@@ -343,11 +343,11 @@ do
           if self.opts.ft_conv[tag.language] then
             tag.language = self.opts.ft_conv[tag.language]
           end
-          if self.opts.ft_map[ft] and not Utils.contains(self.opts.ft_map[ft], tag.language) then
+          if self.opts.ft_map[ft] ~= nil and Utils.contains(self.opts.ft_map[ft], tag.language) == false then
             _continue_0 = true
             break
           end
-          if not self.opts.ft_map[ft] and not ft == tag.language then
+          if self.opts.ft_map[ft] == nil and ft ~= tag.language then
             _continue_0 = true
             break
           end
