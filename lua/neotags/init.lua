@@ -369,6 +369,10 @@ do
       local langmap = self.opts.ft_map[ft] or {
         ft
       }
+      for _, hl in pairs(self.syntax_groups) do
+        coroutine.yield("silent! syntax clear " .. tostring(hl))
+      end
+      self.syntax_groups = { }
       for _, lang in pairs(langmap) do
         local _continue_0 = false
         repeat

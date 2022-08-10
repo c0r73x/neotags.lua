@@ -331,6 +331,11 @@ class Neotags
 
         langmap = @opts.ft_map[ft] or {ft}
 
+        for _, hl in pairs(@syntax_groups)
+            coroutine.yield("silent! syntax clear #{hl}")
+
+        @syntax_groups = {}
+
         for _, lang in pairs(langmap)
             continue if not @languages[lang] or not @languages[lang].order
             cl = @languages[lang]
