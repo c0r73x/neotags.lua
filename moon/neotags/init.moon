@@ -69,7 +69,7 @@ class Neotags
 
     setup: (opts) =>
         @opts = vim.tbl_deep_extend('force', @opts, opts) if opts
-        return if not @opts.enable
+        return unless @opts.enable
 
         vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
@@ -87,9 +87,9 @@ class Neotags
             }
         )
 
-    restart: () =>
+    restart: (cb) =>
         @setup()
-        @run('highlight')
+        @run('highlight', cb)
 
     currentTagfile: () =>
         path = vim.fn.getcwd()
@@ -183,7 +183,7 @@ class Neotags
         if @opts.ctags.verbose
             loop.read_start(stderr, (err, data) -> print data if data)
 
-    run: (func) =>
+    run: (func, cb) =>
         ft = vim.bo.filetype
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
 
@@ -207,14 +207,17 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            vim.cmd(cmd) if cmd and not cmd\match('Vim:E%d+')
+            vim.cmd(cmd) if cmd and cmd\match('Vim:E%d+')
             break if coroutine.status(co) == 'dead'
+
+        cb() if cb
 
     toggle: () =>
         @opts.enable = not @opts.enable
-
-        @restart() if @opts.enable
-        @run('clear') if not @opts.enable
+        if (@opts.enable)
+            @restart(() -> print("Neotags enabled"))
+        else
+            @run('clear', () -> print("Neotags disabled")) 
 
     language: (lang, opts) =>
         @languages[lang] = opts
@@ -301,13 +304,12 @@ class Neotags
         bufnr = api.nvim_get_current_buf()
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
 
-        tags = vim.fn.taglist('.*')
+        tags = vim.fn.taglist('^[a-zA-Z$_].*$')
         groups = {}
 
         for tag in *tags
             continue if not tag.language
             continue if tag.name\match('^[a-zA-Z]{,2}$')
-            continue if tag.name\match('^[0-9]+$')
             continue if tag.name\match('^__anon.*$')
 
             tag.language = tag.language\lower()

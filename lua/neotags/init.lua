@@ -9,7 +9,7 @@ do
       if opts then
         self.opts = vim.tbl_deep_extend('force', self.opts, opts)
       end
-      if not self.opts.enable then
+      if not (self.opts.enable) then
         return 
       end
       vim.api.nvim_create_augroup('NeotagsLua', {
@@ -28,9 +28,9 @@ do
         end
       })
     end,
-    restart = function(self)
+    restart = function(self, cb)
       self:setup()
-      return self:run('highlight')
+      return self:run('highlight', cb)
     end,
     currentTagfile = function(self)
       local path = vim.fn.getcwd()
@@ -156,7 +156,7 @@ do
         end)
       end
     end,
-    run = function(self, func)
+    run = function(self, func, cb)
       local ft = vim.bo.filetype
       if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
         return 
@@ -185,21 +185,27 @@ do
       end
       while true do
         local _, cmd = coroutine.resume(co)
-        if cmd and not cmd:match('Vim:E%d+') then
+        if cmd and cmd:match('Vim:E%d+') then
           vim.cmd(cmd)
         end
         if coroutine.status(co) == 'dead' then
           break
         end
       end
+      if cb then
+        return cb()
+      end
     end,
     toggle = function(self)
       self.opts.enable = not self.opts.enable
-      if self.opts.enable then
-        self:restart()
-      end
-      if not self.opts.enable then
-        return self:run('clear')
+      if (self.opts.enable) then
+        return self:restart(function()
+          return print("Neotags enabled")
+        end)
+      else
+        return self:run('clear', function()
+          return print("Neotags disabled")
+        end)
       end
     end,
     language = function(self, lang, opts)
@@ -317,7 +323,7 @@ do
       self.highlighting = true
       local bufnr = api.nvim_get_current_buf()
       local content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
-      local tags = vim.fn.taglist('.*')
+      local tags = vim.fn.taglist('^[a-zA-Z$_].*$')
       local groups = { }
       for _index_0 = 1, #tags do
         local _continue_0 = false
@@ -328,10 +334,6 @@ do
             break
           end
           if tag.name:match('^[a-zA-Z]{,2}$') then
-            _continue_0 = true
-            break
-          end
-          if tag.name:match('^[0-9]+$') then
             _continue_0 = true
             break
           end
