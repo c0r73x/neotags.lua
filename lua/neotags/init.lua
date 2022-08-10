@@ -185,7 +185,7 @@ do
       end
       while true do
         local _, cmd = coroutine.resume(co)
-        if cmd and not cmd:match('Vim:E%d+') then
+        if cmd then
           vim.cmd(cmd)
         end
         if coroutine.status(co) == 'dead' then
@@ -215,12 +215,14 @@ do
       vim.api.nvim_create_augroup('NeotagsLua', {
         clear = true
       })
-      for _, hl in pairs(self.syntax_groups) do
+      local bufnr = api.nvim_get_current_buf()
+      self.highlighting[bufnr] = false
+      for _, hl in pairs(self.syntax_groups[bufnr]) do
         coroutine.yield("silent! syntax clear " .. tostring(hl))
       end
-      self.syntax_groups = { }
+      self.syntax_groups[bufnr] = { }
     end,
-    makesyntax = function(self, lang, kind, group, opts, content, added)
+    makesyntax = function(self, lang, kind, group, opts, content, added, bufnr)
       local hl = "_Neotags_" .. tostring(lang) .. "_" .. tostring(kind) .. "_" .. tostring(opts.group)
       local matches = { }
       local keywords = { }
@@ -293,6 +295,7 @@ do
       if #merged > 0 then
         notin = "containedin=ALLBUT," .. tostring(table.concat(merged, ','))
       end
+      coroutine.yield("syntax clear " .. tostring(hl))
       for i = 1, #matches, self.opts.hl.patternlength do
         local current = {
           unpack(matches, i, i + self.opts.hl.patternlength)
@@ -310,18 +313,21 @@ do
         local str = table.concat(current, ' ')
         coroutine.yield("syntax keyword " .. tostring(hl) .. " " .. tostring(str) .. " " .. tostring(notin))
       end
-      return table.insert(self.syntax_groups, hl)
+      if not self.syntax_groups[bufnr] then
+        self.syntax_groups[bufnr] = { }
+      end
+      return table.insert(self.syntax_groups[bufnr], hl)
     end,
     highlight = function(self)
-      if self.highlighting then
+      local bufnr = api.nvim_get_current_buf()
+      if self.highlighting[bufnr] then
         return 
       end
       local ft = vim.bo.filetype
       if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
         return 
       end
-      self.highlighting = true
-      local bufnr = api.nvim_get_current_buf()
+      self.highlighting[bufnr] = true
       local content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
       local tags = vim.fn.taglist('^[a-zA-Z$_].*$')
       local groups = { }
@@ -369,10 +375,6 @@ do
       local langmap = self.opts.ft_map[ft] or {
         ft
       }
-      for _, hl in pairs(self.syntax_groups) do
-        coroutine.yield("silent! syntax clear " .. tostring(hl))
-      end
-      self.syntax_groups = { }
       for _, lang in pairs(langmap) do
         local _continue_0 = false
         repeat
@@ -400,7 +402,7 @@ do
                 _continue_1 = true
                 break
               end
-              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added)
+              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added, bufnr)
               _continue_1 = true
             until true
             if not _continue_1 then
@@ -413,7 +415,7 @@ do
           break
         end
       end
-      self.highlighting = false
+      self.highlighting[bufnr] = false
     end
   }
   _base_0.__index = _base_0
@@ -483,7 +485,7 @@ do
       }
       self.languages = { }
       self.syntax_groups = { }
-      self.highlighting = false
+      self.highlighting = { }
       self.ctags_handle = nil
       self.find_handle = nil
     end,

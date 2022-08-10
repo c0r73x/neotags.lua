@@ -63,7 +63,7 @@ class Neotags
         }
         @languages = {}
         @syntax_groups = {}
-        @highlighting = false
+        @highlighting = {}
         @ctags_handle = nil
         @find_handle = nil
 
@@ -207,7 +207,8 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            vim.cmd(cmd) if cmd and not cmd\match('Vim:E%d+')
+            if cmd
+                vim.cmd(cmd)
             break if coroutine.status(co) == 'dead'
 
         cb() if cb
@@ -224,13 +225,15 @@ class Neotags
 
     clearsyntax: () =>
         vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
+        bufnr = api.nvim_get_current_buf()
+        @highlighting[bufnr] = false
 
-        for _, hl in pairs(@syntax_groups)
+        for _, hl in pairs(@syntax_groups[bufnr])
             coroutine.yield("silent! syntax clear #{hl}")
 
-        @syntax_groups = {}
+        @syntax_groups[bufnr] = {}
 
-    makesyntax: (lang, kind, group, opts, content, added) =>
+    makesyntax: (lang, kind, group, opts, content, added, bufnr) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
         matches = {}
@@ -280,6 +283,8 @@ class Neotags
         notin = ''
         notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
 
+        coroutine.yield("syntax clear #{hl}")
+
         for i = 1, #matches, @opts.hl.patternlength
             current = {unpack(matches, i, i + @opts.hl.patternlength)}
             str = table.concat(current, '\\|')
@@ -291,17 +296,19 @@ class Neotags
             str = table.concat(current, ' ')
             coroutine.yield("syntax keyword #{hl} #{str} #{notin}")
 
-        table.insert(@syntax_groups, hl)
+        @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
+        table.insert(@syntax_groups[bufnr], hl)
 
     highlight: () =>
-        return if @highlighting
+        bufnr = api.nvim_get_current_buf()
+
+        return if @highlighting[bufnr]
 
         ft = vim.bo.filetype
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
 
-        @highlighting = true
+        @highlighting[bufnr] = true
 
-        bufnr = api.nvim_get_current_buf()
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
 
         tags = vim.fn.taglist('^[a-zA-Z$_].*$')
@@ -321,20 +328,12 @@ class Neotags
             if @opts.ft_map[ft] == nil and ft != tag.language
                 continue
 
-            -- if tag.language == 'vim'
-                -- print require'lsp'.format_as_json(tag)
-
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
 
             table.insert(groups[tag.language][tag.kind], tag)
 
         langmap = @opts.ft_map[ft] or {ft}
-
-        for _, hl in pairs(@syntax_groups)
-            coroutine.yield("silent! syntax clear #{hl}")
-
-        @syntax_groups = {}
 
         for _, lang in pairs(langmap)
             continue if not @languages[lang] or not @languages[lang].order
@@ -351,9 +350,9 @@ class Neotags
                 continue if not cl.kinds or not cl.kinds[kind]
 
                 -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added, bufnr)
 
-        @highlighting = false
+        @highlighting[bufnr] = false
 
 export neotags = Neotags! if not neotags
 
