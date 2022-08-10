@@ -207,7 +207,7 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            vim.cmd(cmd) if cmd and cmd\match('Vim:E%d+')
+            vim.cmd(cmd) if cmd and not cmd\match('Vim:E%d+')
             break if coroutine.status(co) == 'dead'
 
         cb() if cb
@@ -217,7 +217,7 @@ class Neotags
         if (@opts.enable)
             @restart(() -> print("Neotags enabled"))
         else
-            @run('clear', () -> print("Neotags disabled")) 
+            @run('clear', () -> print("Neotags disabled"))
 
     language: (lang, opts) =>
         @languages[lang] = opts
