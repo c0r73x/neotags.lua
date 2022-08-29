@@ -8,7 +8,7 @@
         i: { group: 'neotags_InterfaceTag' },
         v: { group: 'neotags_GlobalVarTag' },
         f: {
-          group: 'neotags_functionTag',
+          group: 'neotags_FunctionTag',
           suffix: [[\>\%(\s*(\|\s*:\?=\s*func\)\@=]],
         },
         m: {
