@@ -12,17 +12,17 @@ do
       if not (self.opts.enable) then
         return 
       end
-      vim.api.nvim_create_augroup('NeotagsLua', {
+      local group = vim.api.nvim_create_augroup('NeotagsLua', {
         clear = true
       })
       vim.api.nvim_create_autocmd('Syntax', {
-        group = 'NeotagsLua',
+        group = group,
         callback = function()
           return require('neotags').highlight()
         end
       })
       return vim.api.nvim_create_autocmd('BufWritePost', {
-        group = 'NeotagsLua',
+        group = group,
         callback = function()
           return require('neotags').update()
         end

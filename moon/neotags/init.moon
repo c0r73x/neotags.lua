@@ -71,18 +71,18 @@ class Neotags
         @opts = vim.tbl_deep_extend('force', @opts, opts) if opts
         return unless @opts.enable
 
-        vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
+        group = vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
             'Syntax',
             {
-                group: 'NeotagsLua',
+                group: group,
                 callback: () -> require'neotags'.highlight()
             }
         )
         vim.api.nvim_create_autocmd(
             'BufWritePost',
             {
-                group: 'NeotagsLua',
+                group: group,
                 callback: () -> require'neotags'.update()
             }
         )
