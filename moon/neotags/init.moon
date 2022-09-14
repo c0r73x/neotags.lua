@@ -7,6 +7,10 @@ class Neotags
     new: (opts) =>
         @opts = {
             enable: true,
+            autocmd: {
+                highlight: { 'Syntax' },
+                update: { 'BufWritePost' },
+            },
             ft_conv: {
                 ['c++']: 'cpp',
                 ['moonscript']: 'moon',
@@ -73,14 +77,14 @@ class Neotags
 
         group = vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
-            'Syntax',
+            @opts.autocmd.highlight,
             {
                 group: group,
                 callback: () -> require'neotags'.highlight()
             }
         )
         vim.api.nvim_create_autocmd(
-            'BufWritePost',
+            @opts.autocmd.update,
             {
                 group: group,
                 callback: () -> require'neotags'.update()
@@ -207,8 +211,7 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            if cmd
-                vim.cmd(cmd)
+            vim.cmd(cmd) if cmd
             break if coroutine.status(co) == 'dead'
 
         cb() if cb
@@ -233,7 +236,7 @@ class Neotags
 
         @syntax_groups[bufnr] = {}
 
-    makesyntax: (lang, kind, group, opts, content, added, bufnr) =>
+    makesyntax: (lang, kind, group, opts, added, bufnr) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
         matches = {}
@@ -251,10 +254,6 @@ class Neotags
             continue if #tag.name < minlen
             continue if Utils.contains(added, tag.name)
             continue if Utils.contains(forbidden, tag.name)
-
-            if not content\find(tag.name)
-                table.insert(added, tag.name)
-                continue
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\find('.', 1, true) and
@@ -313,11 +312,17 @@ class Neotags
 
         tags = vim.fn.taglist('^[a-zA-Z$_].*$')
         groups = {}
+        added = {}
 
         for tag in *tags
             continue if not tag.language
             continue if tag.name\match('^[a-zA-Z]{,2}$')
             continue if tag.name\match('^__anon.*$')
+            continue if Utils.contains(added, tag.name)
+
+            if not content\find(tag.name)
+                table.insert(added, tag.name)
+                continue
 
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
@@ -339,7 +344,6 @@ class Neotags
             continue if not @languages[lang] or not @languages[lang].order
             cl = @languages[lang]
             order = cl.order
-            added = {}
             kinds = groups[lang]
             continue if not kinds
 
@@ -350,7 +354,7 @@ class Neotags
                 continue if not cl.kinds or not cl.kinds[kind]
 
                 -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added, bufnr)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], added, bufnr)
 
         @highlighting[bufnr] = false
 

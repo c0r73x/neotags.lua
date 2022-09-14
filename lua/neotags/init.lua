@@ -15,13 +15,13 @@ do
       local group = vim.api.nvim_create_augroup('NeotagsLua', {
         clear = true
       })
-      vim.api.nvim_create_autocmd('Syntax', {
+      vim.api.nvim_create_autocmd(self.opts.autocmd.highlight, {
         group = group,
         callback = function()
           return require('neotags').highlight()
         end
       })
-      return vim.api.nvim_create_autocmd('BufWritePost', {
+      return vim.api.nvim_create_autocmd(self.opts.autocmd.update, {
         group = group,
         callback = function()
           return require('neotags').update()
@@ -222,7 +222,7 @@ do
       end
       self.syntax_groups[bufnr] = { }
     end,
-    makesyntax = function(self, lang, kind, group, opts, content, added, bufnr)
+    makesyntax = function(self, lang, kind, group, opts, added, bufnr)
       local hl = "_Neotags_" .. tostring(lang) .. "_" .. tostring(kind) .. "_" .. tostring(opts.group)
       local matches = { }
       local keywords = { }
@@ -245,11 +245,6 @@ do
             break
           end
           if Utils.contains(forbidden, tag.name) then
-            _continue_0 = true
-            break
-          end
-          if not content:find(tag.name) then
-            table.insert(added, tag.name)
             _continue_0 = true
             break
           end
@@ -331,6 +326,7 @@ do
       local content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
       local tags = vim.fn.taglist('^[a-zA-Z$_].*$')
       local groups = { }
+      local added = { }
       for _index_0 = 1, #tags do
         local _continue_0 = false
         repeat
@@ -344,6 +340,15 @@ do
             break
           end
           if tag.name:match('^__anon.*$') then
+            _continue_0 = true
+            break
+          end
+          if Utils.contains(added, tag.name) then
+            _continue_0 = true
+            break
+          end
+          if not content:find(tag.name) then
+            table.insert(added, tag.name)
             _continue_0 = true
             break
           end
@@ -384,7 +389,6 @@ do
           end
           local cl = self.languages[lang]
           local order = cl.order
-          local added = { }
           local kinds = groups[lang]
           if not kinds then
             _continue_0 = true
@@ -402,7 +406,7 @@ do
                 _continue_1 = true
                 break
               end
-              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], content, added, bufnr)
+              self:makesyntax(lang, kind, kinds[kind], cl.kinds[kind], added, bufnr)
               _continue_1 = true
             until true
             if not _continue_1 then
@@ -423,6 +427,14 @@ do
     __init = function(self, opts)
       self.opts = {
         enable = true,
+        autocmd = {
+          highlight = {
+            'Syntax'
+          },
+          update = {
+            'BufWritePost'
+          }
+        },
         ft_conv = {
           ['c++'] = 'cpp',
           ['moonscript'] = 'moon',
