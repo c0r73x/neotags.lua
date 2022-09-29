@@ -482,7 +482,7 @@ do
           run = true,
           directory = vim.fn.expand('~/.vim_tags'),
           verbose = false,
-          ptags = true,
+          ptags = false,
           binary = 'ctags',
           args = {
             '--fields=+l',
