@@ -42,12 +42,27 @@ do
         return 
       end
       local tagfile = self:currentTagfile()
-      local args = self.opts.ctags.args
-      args = Utils.concat(args, {
-        '-f',
-        tagfile
-      })
-      args = Utils.concat(args, files)
+      local args = { }
+      if self.opts.ctags.ptags then
+        for _, arg in ipairs(self.opts.ctags.args) do
+          if string.match(arg, '^%-%-') then
+            table.insert(args, "-c")
+          end
+          table.insert(args, arg)
+        end
+        args = Utils.concat(args, {
+          '-f',
+          tagfile
+        })
+        table.insert(args, vim.fn.getcwd())
+      else
+        args = self.opts.ctags.args
+        args = Utils.concat(args, {
+          '-f',
+          tagfile
+        })
+        args = Utils.concat(args, files)
+      end
       local stdout
       if self.opts.ctags.verbose then
         stdout = loop.new_pipe(false)
@@ -97,9 +112,13 @@ do
       if #ft == 0 or Utils.contains(self.opts.ignore, ft) then
         return 
       end
-      return self:findFiles(function(files)
-        return self:runCtags(files)
-      end)
+      if self.opts.ctags.ptags then
+        return self:runCtags(nil)
+      else
+        return self:findFiles(function(files)
+          return self:runCtags(files)
+        end)
+      end
     end,
     findFiles = function(self, callback)
       local path = vim.fn.getcwd()
@@ -463,6 +482,7 @@ do
           run = true,
           directory = vim.fn.expand('~/.vim_tags'),
           verbose = false,
+          ptags = true,
           binary = 'ctags',
           args = {
             '--fields=+l',

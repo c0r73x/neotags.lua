@@ -33,7 +33,8 @@ class Neotags
                 run: true,
                 directory: vim.fn.expand('~/.vim_tags'),
                 verbose: false,
-                binary: 'ctags'
+                ptags: true,
+                binary: 'ctags',
                 args: {
                     '--fields=+l',
                     '--c-kinds=+p',
@@ -104,9 +105,20 @@ class Neotags
         return if @ctags_handle
 
         tagfile = @currentTagfile()
-        args = @opts.ctags.args
-        args = Utils.concat(args, { '-f', tagfile })
-        args = Utils.concat(args, files)
+        args = {}
+
+        if @opts.ctags.ptags
+            for _, arg in ipairs(@opts.ctags.args)
+                if string.match(arg, '^%-%-')
+                    table.insert(args, "-c")
+                table.insert(args, arg)
+
+            args = Utils.concat(args, { '-f', tagfile })
+            table.insert(args, vim.fn.getcwd())
+        else
+            args = @opts.ctags.args
+            args = Utils.concat(args, { '-f', tagfile })
+            args = Utils.concat(args, files)
 
         stdout = loop.new_pipe(false) if @opts.ctags.verbose
         stderr = loop.new_pipe(false) if @opts.ctags.verbose
@@ -144,7 +156,10 @@ class Neotags
         ft = vim.bo.filetype
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
 
-        @findFiles((files) -> @runCtags(files))
+        if @opts.ctags.ptags
+            @runCtags(nil)
+        else
+            @findFiles((files) -> @runCtags(files))
 
     findFiles: (callback) =>
         path = vim.fn.getcwd()
