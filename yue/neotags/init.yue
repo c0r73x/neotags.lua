@@ -373,9 +373,9 @@ class Neotags
 
         @highlighting[bufnr] = false
 
-export neotags = Neotags! if not neotags
+global neotags = Neotags! if not neotags
 
-return {
+export default {
     setup: (opts) ->
         path = debug.getinfo(1).source\match('@?(.*/)')
         for filename in io.popen("ls #{path}/languages")\lines()

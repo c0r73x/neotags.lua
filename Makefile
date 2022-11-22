@@ -3,13 +3,13 @@
 # c0r73x, 2021-12-20 16:40
 #
 
-.PHONY: moon
-all: moon
+.PHONY: yue
+all: yue
 
-moon:
+yue:
 	@mkdir -p ./lua &> /dev/null
-	@moonc -t /tmp ./moon/
-	@cp -r /tmp/moon/* ./lua
-	@rm -rf /tmp/moon
+	@yue -s -m -t /tmp/yue ./yue
+	@cp -r /tmp/yue/* ./lua
+	@rm -rf /tmp/yue
 
 # vim:ft=make
