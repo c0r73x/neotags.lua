@@ -1,0 +1,1 @@
+return{order='mfcv',kinds={m={group='neotags_MethodTag',prefix=[[\(\.\|\<def\s\+\)\@<=]]},f={group='neotags_FunctionTag',prefix=[[\%(\<def\s\+\)\@<!\<]]},g={group='neotags_ClassTag'},v={group='neotags_GlobalVarTag'}}}
