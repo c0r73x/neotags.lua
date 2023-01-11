@@ -295,7 +295,7 @@ class Neotags
                 merged[#merged+1] = b[i] if b[i]
 
         notin = ''
-        notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+        notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
 
         coroutine.yield("syntax clear #{hl}")
 
