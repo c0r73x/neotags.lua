@@ -3,8 +3,9 @@ class Utils
         return false if not input
         return false if not el
 
-        for _, value in pairs(input)
+        for key, value in pairs(input)
             return true if value == el
+            return true if key == el
         return false
 
     concat: (a, b) ->

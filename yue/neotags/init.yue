@@ -251,7 +251,7 @@ class Neotags
 
         @syntax_groups[bufnr] = {}
 
-    makesyntax: (lang, kind, group, opts, bufnr) =>
+    makesyntax: (lang, kind, group, opts, bufnr, langcontains) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
         added = {}
@@ -284,19 +284,22 @@ class Neotags
 
         table.sort(matches, (a, b) -> a < b)
         merged = {}
-
-        if opts.extend_notin and opts.extend_notin == false
-            merged = opts.notin or @opts.notin or {}
-        else
-            a = @opts.notin or {}
-            b = opts.notin or {}
-            max = (#a > #b) and #a or #b
-            for i=1,max
-                merged[#merged+1] = a[i] if a[i]
-                merged[#merged+1] = b[i] if b[i]
-
         notin = ''
-        notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+
+        if not langcontains
+            if opts.extend_notin != nil and opts.extend_notin == false
+                merged = opts.notin or @opts.notin or {}
+            else
+                a = @opts.notin or {}
+                b = opts.notin or {}
+                max = (#a > #b) and #a or #b
+                for i=1,max
+                    merged[#merged+1] = a[i] if a[i]
+                    merged[#merged+1] = b[i] if b[i]
+
+            notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+        else
+            notin = "contained containedin=#{table.concat(langcontains, ',')}"
 
         coroutine.yield("syntax clear #{hl}")
 
@@ -305,14 +308,13 @@ class Neotags
             str = table.concat(current, '\\|')
             coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
-        notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+        notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
 
         table.sort(keywords, (a, b) -> a < b)
         for i = 1, #keywords, @opts.hl.patternlength
             current = {unpack(keywords, i, i + @opts.hl.patternlength)}
             str = table.concat(current, ' ')
-            -- print("syntax keyword #{hl} #{str} #{notin}")
-            coroutine.yield("syntax keyword #{hl} #{str} #{notin}")
+            coroutine.yield("syntax keyword #{hl} #{str} #{notin} display")
 
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
         table.insert(@syntax_groups[bufnr], hl)
@@ -350,6 +352,7 @@ class Neotags
             if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
                 continue
 
+
             if @opts.ft_map[ft] == nil and ft != tag.language
                 continue
 
@@ -361,7 +364,17 @@ class Neotags
 
         langmap = @opts.ft_map[ft] or {ft}
 
-        for _, lang in pairs(langmap)
+        for klang, vlang in pairs(langmap)
+            lang = vlang if type(klang) != "string"
+            langcontains = nil
+
+            print(type(klang), klang, vlang)
+            if type(klang) == "string"
+                lang = klang
+                langcontains = vlang
+
+            print(lang, langcontains)
+
             continue if not @languages[lang] or not @languages[lang].order
             cl = @languages[lang]
             order = cl.order
@@ -374,7 +387,7 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr, langcontains)
 
         @highlighting[bufnr] = false
 
