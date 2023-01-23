@@ -368,12 +368,9 @@ class Neotags
             lang = vlang if type(klang) != "string"
             langcontains = nil
 
-            print(type(klang), klang, vlang)
             if type(klang) == "string"
                 lang = klang
                 langcontains = vlang
-
-            print(lang, langcontains)
 
             continue if not @languages[lang] or not @languages[lang].order
             cl = @languages[lang]
