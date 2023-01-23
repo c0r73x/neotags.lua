@@ -305,10 +305,13 @@ class Neotags
             str = table.concat(current, '\\|')
             coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
+        notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+
         table.sort(keywords, (a, b) -> a < b)
         for i = 1, #keywords, @opts.hl.patternlength
             current = {unpack(keywords, i, i + @opts.hl.patternlength)}
             str = table.concat(current, ' ')
+            -- print("syntax keyword #{hl} #{str} #{notin}")
             coroutine.yield("syntax keyword #{hl} #{str} #{notin}")
 
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
@@ -337,7 +340,7 @@ class Neotags
             continue if tag.name\match('^_?_?anon.*$')
             continue if Utils.contains(added, tag.name)
 
-            if not content\find(tag.name)
+            if not content\find("%W#{tag.name}%W")
                 table.insert(added, tag.name)
                 continue
 

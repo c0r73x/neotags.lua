@@ -1,7 +1,7 @@
 {
     order: 'csi',
     kinds: {
-        s: { group: 'neotags_PreProcTypeTag' },
+        s: { group: 'neotags_PreProcTag' },
         c: { group: 'neotags_ClassTag' },
         i: { group: 'neotags_VariableTag' },
     }
