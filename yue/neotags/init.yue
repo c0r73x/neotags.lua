@@ -251,9 +251,10 @@ class Neotags
 
         @syntax_groups[bufnr] = {}
 
-    makesyntax: (lang, kind, group, opts, added, bufnr) =>
+    makesyntax: (lang, kind, group, opts, bufnr) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
+        added = {}
         matches = {}
         keywords = {}
 
@@ -274,7 +275,7 @@ class Neotags
                     opts.allow_keyword != false and not tag.name\find('.', 1, true) and
                     tag.name != 'contains')
                 table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
-            else
+            elseif not tag.name\find('.', 1, true)
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
 
             table.insert(added, tag.name)
@@ -284,7 +285,7 @@ class Neotags
         table.sort(matches, (a, b) -> a < b)
         merged = {}
 
-        if opts.extended_notin and opts.extend_notin == false
+        if opts.extend_notin and opts.extend_notin == false
             merged = opts.notin or @opts.notin or {}
         else
             a = @opts.notin or {}
@@ -295,7 +296,7 @@ class Neotags
                 merged[#merged+1] = b[i] if b[i]
 
         notin = ''
-        notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+        notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
 
         coroutine.yield("syntax clear #{hl}")
 
@@ -331,8 +332,9 @@ class Neotags
 
         for tag in *tags
             continue if not tag.language
+            continue if #tag.name < @opts.hl.minlen
             continue if tag.name\match('^[a-zA-Z]{,2}$')
-            continue if tag.name\match('^__anon.*$')
+            continue if tag.name\match('^_?_?anon.*$')
             continue if Utils.contains(added, tag.name)
 
             if not content\find(tag.name)
@@ -352,6 +354,7 @@ class Neotags
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
 
             table.insert(groups[tag.language][tag.kind], tag)
+            table.insert(added, tag.name)
 
         langmap = @opts.ft_map[ft] or {ft}
 
@@ -368,8 +371,7 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
-                -- print "adding #{kinds[kind]} for #{lang} in #{kind}"
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], added, bufnr)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr)
 
         @highlighting[bufnr] = false
 
