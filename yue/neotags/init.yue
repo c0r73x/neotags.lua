@@ -97,9 +97,18 @@ class Neotags
         @run('highlight', cb)
 
     currentTagfile: () =>
+        if vim.b.neotags_current_tagfile and #vim.b.neotags_current_tagfile > 0
+            return vim.b.neotags_current_tagfile
+
         path = vim.fn.getcwd()
         path = path\gsub('[%.%/]', '__')
-        return "#{@opts.ctags.directory}/#{path}.tags"
+        dir = @opts.ctags.directory
+        dir = dir() if type(dir) == 'function'
+
+        os.execute("mkdir -p #{dir} 2> /dev/null")
+        vim.b.neotags_current_tagfile = "#{dir}/#{path}.tags"
+
+        return vim.b.neotags_current_tagfile
 
     runCtags: (files) =>
         return if @ctags_handle
