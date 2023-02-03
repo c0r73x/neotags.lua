@@ -235,7 +235,9 @@ class Neotags
 
         while true do
             _, cmd = coroutine.resume(co)
-            vim.cmd(cmd) if cmd
+            vim.defer_fn(() ->
+                vim.cmd(cmd),
+            10) if cmd
             break if coroutine.status(co) == 'dead'
 
         cb() if cb
