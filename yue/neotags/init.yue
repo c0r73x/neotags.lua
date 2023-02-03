@@ -348,8 +348,12 @@ class Neotags
             continue if not tag.language
             continue if #tag.name < @opts.hl.minlen
             continue if tag.name\match('^[a-zA-Z]{,2}$')
-            continue if tag.name\match('^_?_?anon.*$')
+            continue if tag.name\match('^_?_?anon')
             continue if Utils.contains(added, tag.name)
+
+            if not content\find(tag.name, 1, true)
+                table.insert(added, tag.name)
+                continue
 
             if not content\find("%W#{tag.name}%W")
                 table.insert(added, tag.name)
