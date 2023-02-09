@@ -105,7 +105,7 @@ class Neotags
         dir = @opts.ctags.directory
         dir = dir() if type(dir) == 'function'
 
-        os.execute("mkdir -p #{dir} 2> /dev/null")
+        os.execute("[ ! -d '#{dir}' ] && mkdir -p '#{dir}' &> /dev/null")
         vim.b.neotags_current_tagfile = "#{dir}/#{path}.tags"
 
         return vim.b.neotags_current_tagfile
