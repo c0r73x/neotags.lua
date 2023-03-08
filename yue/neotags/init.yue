@@ -281,8 +281,6 @@ class Neotags
             continue if Utils.contains(added, tag.name\lower())
             continue if Utils.contains(forbidden, tag.name)
 
-            print(vim.inspect(added))
-
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\find('.', 1, true) and
                     tag.name != 'contains')
