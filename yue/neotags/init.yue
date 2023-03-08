@@ -262,10 +262,9 @@ class Neotags
 
         @syntax_groups[bufnr] = {}
 
-    makesyntax: (lang, kind, group, opts, bufnr, langcontains) =>
+    makesyntax: (lang, kind, group, opts, bufnr, langcontains, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
-        added = {}
         matches = {}
         keywords = {}
 
@@ -279,8 +278,10 @@ class Neotags
 
         for tag in *group
             continue if #tag.name < minlen
-            continue if Utils.contains(added, tag.name)
+            continue if Utils.contains(added, tag.name\lower())
             continue if Utils.contains(forbidden, tag.name)
+
+            print(vim.inspect(added))
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     opts.allow_keyword != false and not tag.name\find('.', 1, true) and
@@ -289,8 +290,9 @@ class Neotags
             elseif not tag.name\find('.', 1, true)
                 table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
 
-            table.insert(added, tag.name)
+            table.insert(added, tag.name\lower())
 
+        return if #added == 0
         vim.api.nvim_set_hl(0, hl, { link: opts.group })
 
         table.sort(matches, (a, b) -> a < b)
@@ -344,25 +346,20 @@ class Neotags
 
         tags = vim.fn.taglist('^[a-zA-Z$_].*$')
         groups = {}
-        added = {}
 
         for tag in *tags
             continue if not tag.language
-            continue if #tag.name < @opts.hl.minlen
-            continue if tag.name\match('^[a-zA-Z]{,2}$')
-            continue if tag.name\match('^_?_?anon')
-            continue if Utils.contains(added, tag.name)
-
-            if not content\find(tag.name, 1, true)
-                table.insert(added, tag.name)
-                continue
-
-            if not content\find("%W#{tag.name}%W")
-                table.insert(added, tag.name)
-                continue
 
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
+
+            continue if not @languages[tag.language]
+            continue if not @languages[tag.language].order
+            continue if not @languages[tag.language].order\find(tag.kind)
+
+            continue if #tag.name < @opts.hl.minlen
+            continue if tag.name\match('^[a-zA-Z]{,2}$')
+            continue if tag.name\match('^_?_?anon')
 
             if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
                 continue
@@ -371,11 +368,16 @@ class Neotags
             if @opts.ft_map[ft] == nil and ft != tag.language
                 continue
 
+            if not content\find(tag.name)
+                continue
+
+            if not content\find("%W#{tag.name}%W") and not content\find("^#{tag.name}%W")
+                continue
+
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
 
             table.insert(groups[tag.language][tag.kind], tag)
-            table.insert(added, tag.name)
 
         langmap = @opts.ft_map[ft] or {ft}
 
@@ -392,6 +394,7 @@ class Neotags
             order = cl.order
             kinds = groups[lang]
             continue if not kinds
+            added = {}
 
             for i = 1, #order
                 kind = order\sub(i, i)
@@ -399,7 +402,7 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
-                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr, langcontains)
+                @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr, langcontains, added)
 
         @highlighting[bufnr] = false
 
