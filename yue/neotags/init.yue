@@ -115,6 +115,7 @@ class Neotags
 
         tagfile = @currentTagfile()
         args = {}
+        concat = Utils.concat
 
         if @opts.ctags.ptags
             for _, arg in ipairs(@opts.ctags.args)
@@ -122,12 +123,12 @@ class Neotags
                     table.insert(args, "-c")
                 table.insert(args, arg)
 
-            args = Utils.concat(args, { '-f', tagfile })
+            args = concat(args, { '-f', tagfile })
             table.insert(args, vim.fn.getcwd())
         else
             args = @opts.ctags.args
-            args = Utils.concat(args, { '-f', tagfile })
-            args = Utils.concat(args, files)
+            args = concat(args, { '-f', tagfile })
+            args = concat(args, files)
 
         stdout = loop.new_pipe(false) if @opts.ctags.verbose
         stderr = loop.new_pipe(false) if @opts.ctags.verbose
@@ -204,8 +205,9 @@ class Neotags
         loop.read_start(stdout, (err, data) ->
             return unless data
 
+            insert = table.insert
             for _, file in ipairs(Utils.explode('\n', data))
-                table.insert(files, file)
+                insert(files, file)
         )
 
         if @opts.ctags.verbose
@@ -257,8 +259,10 @@ class Neotags
         bufnr = api.nvim_get_current_buf()
         @highlighting[bufnr] = false
 
+        yield = coroutine.yield
+
         for _, hl in pairs(@syntax_groups[bufnr])
-            coroutine.yield("silent! syntax clear #{hl}")
+            yield("silent! syntax clear #{hl}")
 
         @syntax_groups[bufnr] = {}
 
@@ -268,9 +272,13 @@ class Neotags
         matches = {}
         keywords = {}
 
+        contains = Utils.contains
+        insert = table.insert
+        allow_keyword = opts.allow_keyword
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
         minlen = opts.minlen or @opts.hl.minlen
+        yield = coroutine.yield
 
         forbidden = {
             '*',
@@ -278,17 +286,17 @@ class Neotags
 
         for tag in *group
             continue if #tag.name < minlen
-            continue if Utils.contains(added, tag.name\lower())
-            continue if Utils.contains(forbidden, tag.name)
+            continue if contains(added, tag.name\lower())
+            continue if contains(forbidden, tag.name)
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
-                    opts.allow_keyword != false and not tag.name\find('.', 1, true) and
+                    allow_keyword != false and not tag.name\find('.', 1, true) and
                     tag.name != 'contains')
-                table.insert(keywords, tag.name) if not Utils.contains(keywords, tag.name)
+                insert(keywords, tag.name) if not contains(keywords, tag.name)
             elseif not tag.name\find('.', 1, true)
-                table.insert(matches, tag.name) if not Utils.contains(matches, tag.name)
+                insert(matches, tag.name) if not contains(matches, tag.name)
 
-            table.insert(added, tag.name\lower())
+            insert(added, tag.name\lower())
 
         return if #added == 0
         vim.api.nvim_set_hl(0, hl, { link: opts.group })
@@ -312,20 +320,21 @@ class Neotags
         else
             notin = "contained containedin=#{table.concat(langcontains, ',')}"
 
-        coroutine.yield("syntax clear #{hl}")
+        yield("syntax clear #{hl}")
 
-        for i = 1, #matches, @opts.hl.patternlength
-            current = {unpack(matches, i, i + @opts.hl.patternlength)}
+        patternlength = @opts.hl.patternlength
+        for i = 1, #matches, patternlength
+            current = {unpack(matches, i, i + patternlength)}
             str = table.concat(current, '\\|')
-            coroutine.yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
+            yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
         notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
 
         table.sort(keywords, (a, b) -> a < b)
-        for i = 1, #keywords, @opts.hl.patternlength
-            current = {unpack(keywords, i, i + @opts.hl.patternlength)}
+        for i = 1, #keywords, patternlength
+            current = {unpack(keywords, i, i + patternlength)}
             str = table.concat(current, ' ')
-            coroutine.yield("syntax keyword #{hl} #{str} #{notin} display")
+            yield("syntax keyword #{hl} #{str} #{notin} display")
 
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
         table.insert(@syntax_groups[bufnr], hl)

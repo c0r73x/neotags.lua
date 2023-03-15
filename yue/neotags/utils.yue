@@ -21,8 +21,11 @@ class Utils
 
         pos,arr = 0, {}
 
+        insert = table.insert
+        sub = string.sub
+
         for st, sp in () -> string.find(str,div,pos,true)
-            table.insert(arr, string.sub(str, pos, st - 1))
+            insert(arr, sub(str, pos, st - 1))
             pos = sp + 1
 
         return arr
