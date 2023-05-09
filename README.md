@@ -11,7 +11,7 @@ neotags.setup({
     enable = true, -- enable neotags.lua
     ctags = {
         run = true, -- run ctags
-        directory = '~/.vim_tags' -- default directory where to store tags
+        directory = vim.env.HOME .. '/.vim_tags' -- default directory where to store tags
         verbose = false -- verbose ctags output
         binary = 'ctags', -- ctags binary
         args = { -- ctags arguments
