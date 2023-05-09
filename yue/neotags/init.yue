@@ -182,6 +182,7 @@ class Neotags
 
         files = {}
         args = Utils.concat(@opts.tools.find.args, { path })
+        output = ''
         @find_handle = loop.spawn(
             @opts.tools.find.binary, {
                 args: args,
@@ -198,16 +199,15 @@ class Neotags
 
                 @find_handle\close()
                 @find_handle = nil
+
+                files = Utils.explode('\n', output)
                 callback(files)
             )
         )
 
         loop.read_start(stdout, (err, data) ->
             return unless data
-
-            insert = table.insert
-            for _, file in ipairs(Utils.explode('\n', data))
-                insert(files, file)
+            output = "#{output}#{data}"
         )
 
         if @opts.ctags.verbose

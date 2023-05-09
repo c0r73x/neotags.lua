@@ -25,7 +25,8 @@ class Utils
         sub = string.sub
 
         for st, sp in () -> string.find(str,div,pos,true)
-            insert(arr, sub(str, pos, st - 1))
+            at = sub(str, pos, st - 1)
+            insert(arr, at) if #at > 0
             pos = sp + 1
 
         return arr
