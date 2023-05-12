@@ -120,11 +120,11 @@ class Neotags
         if @opts.ctags.ptags
             for _, arg in ipairs(@opts.ctags.args)
                 if string.match(arg, '^%-%-')
-                    table.insert(args, "-c")
-                table.insert(args, arg)
+                    args[#args + 1] = "-c"
+                args[#args + 1] = arg
 
             args = concat(args, { '-f', tagfile })
-            table.insert(args, vim.fn.getcwd())
+            args[#args + 1] = vim.fn.getcwd()
         else
             args = @opts.ctags.args
             args = concat(args, { '-f', tagfile })
@@ -273,7 +273,6 @@ class Neotags
         keywords = {}
 
         contains = Utils.contains
-        insert = table.insert
         allow_keyword = opts.allow_keyword
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
@@ -292,11 +291,11 @@ class Neotags
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     allow_keyword != false and not tag.name\find('.', 1, true) and
                     tag.name != 'contains')
-                insert(keywords, tag.name) if not contains(keywords, tag.name)
+                keywords[#keywords + 1] = tag.name if not contains(keywords, tag.name)
             elseif not tag.name\find('.', 1, true)
-                insert(matches, tag.name) if not contains(matches, tag.name)
+                matches[#matches + 1] = tag.name if not contains(matches, tag.name)
 
-            insert(added, tag.name\lower())
+            added[#added + 1] = tag.name\lower()
 
         return if #added == 0
         vim.api.nvim_set_hl(0, hl, { link: opts.group })
@@ -337,7 +336,7 @@ class Neotags
             yield("syntax keyword #{hl} #{str} #{notin} display")
 
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
-        table.insert(@syntax_groups[bufnr], hl)
+        @syntax_groups[bufnr][#@syntax_groups[bufnr] + 1] = hl
 
     highlight: () =>
         bufnr = api.nvim_get_current_buf()
@@ -383,8 +382,7 @@ class Neotags
 
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
-
-            table.insert(groups[tag.language][tag.kind], tag)
+            groups[tag.language][tag.kind][#groups[tag.language][tag.kind] + 1] = tag
 
         langmap = @opts.ft_map[ft] or {ft}
 

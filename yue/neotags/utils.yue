@@ -21,12 +21,11 @@ class Utils
 
         pos,arr = 0, {}
 
-        insert = table.insert
         sub = string.sub
 
         for st, sp in () -> string.find(str,div,pos,true)
             at = sub(str, pos, st - 1)
-            insert(arr, at) if #at > 0
+            arr[#arr + 1] = at if #at > 0
             pos = sp + 1
 
         return arr
