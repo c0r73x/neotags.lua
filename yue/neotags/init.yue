@@ -364,6 +364,10 @@ class Neotags
             continue if not @languages[tag.language].order\find(tag.kind)
 
             continue if #tag.name < @opts.hl.minlen
+
+            if @languages[tag.language].reserved
+                continue if Utils.contains(@languages[tag.language].reserved, tag.name)
+
             continue if tag.name\match('^[a-zA-Z]{,2}$')
             continue if tag.name\match('^_?_?anon')
 
