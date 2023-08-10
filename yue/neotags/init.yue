@@ -405,6 +405,12 @@ class Neotags
             continue if not kinds
             added = {}
 
+            if @languages[lang].reserved
+                reserved = [{name: reserved} for reserved in *@languages[lang].reserved]
+                @makesyntax(lang, 'reserved', reserved, {
+                    group: 'neotags_Reserved',
+                }, bufnr, langcontains, added)
+
             for i = 1, #order
                 kind = order\sub(i, i)
 

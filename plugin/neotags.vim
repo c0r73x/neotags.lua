@@ -16,3 +16,5 @@ highlight def link neotags_ModuleTag    PreProc
 highlight def link neotags_ObjectTag    Identifier
 highlight def link neotags_PreProcTag   PreProc
 highlight def link neotags_TypeTag      Type
+
+highlight def link neotags_Reserved     Keyword
