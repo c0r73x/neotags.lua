@@ -1,5 +1,5 @@
 api = vim.api
-loop = vim.loop
+loop = vim.uv
 
 Utils = require'neotags/utils'
 
