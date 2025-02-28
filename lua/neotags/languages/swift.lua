@@ -1,0 +1,1 @@
+return{order='icsntf',kinds={c={group='neotags_ClassTag'},s={group='neotags_StructTag'},n={group='neotags_EnumTag'},t={group='neotags_TypeTag'},f={group='neotags_MethodTag'},i={group='neotags_ImportTag'}}}

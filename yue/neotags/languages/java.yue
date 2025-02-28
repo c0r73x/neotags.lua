@@ -1,0 +1,29 @@
+{
+    order: 'cegimIJf',
+    kinds: {
+        c: {
+            group: 'neotags_ClassTag'
+        },
+        e: {
+            group: 'neotags_EnumTag'
+        },
+        g: {
+            group: 'neotags_EnumTag'
+        },
+        m: {
+            group: 'neotags_MethodTag'
+        },
+        f: {
+            group: 'neotags_MemberTag'
+        },
+        i: {
+            group: 'neotags_InterfaceTag',
+        },
+        J: {
+            group: 'neotags_ImportTag',
+        },
+        I: {
+            group: 'neotags_ImportTag',
+        },
+    }
+}
