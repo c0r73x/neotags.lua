@@ -8,7 +8,7 @@ class Neotags
         @opts = {
             enable: true,
             autocmd: {
-                highlight: { 'Syntax' },
+                highlight: { 'Syntax', 'BufReadPost' },
                 update: { 'BufWritePost' },
             },
             ft_conv: {
