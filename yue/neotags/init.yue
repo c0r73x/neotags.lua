@@ -25,6 +25,7 @@ class Neotags
                 patternlength: 2048,
                 prefix: [[\C\<]],
                 suffix: [[\>]],
+                treesitter: false,
             },
             tools: {
                 find: nil,
@@ -69,16 +70,22 @@ class Neotags
         @languages = {}
         @syntax_groups = {}
         @highlighting = {}
+        @query_cache = {}
         @ctags_handle = nil
         @find_handle = nil
+        @ns_id = vim.api.nvim_create_namespace('neotags')
 
     setup: (opts) =>
         @opts = vim.tbl_deep_extend('force', @opts, opts) if opts
         return unless @opts.enable
 
+        hl_events = @opts.autocmd.highlight
+        if @opts.hl.treesitter and #hl_events == 1 and hl_events[1] == 'Syntax'
+            hl_events = { 'BufEnter', 'BufReadPost' }
+
         group = vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
         vim.api.nvim_create_autocmd(
-            @opts.autocmd.highlight,
+            hl_events,
             {
                 group: group,
                 callback: () -> require'neotags'.highlight()
@@ -134,7 +141,7 @@ class Neotags
         stderr = loop.new_pipe(false) if @opts.ctags.verbose
 
         @ctags_handle = loop.spawn(
-             @opts.ctags.binary, {
+            @opts.ctags.binary, {
                 args: args,
                 cwd: vim.fn.getcwd(),
                 stdio: {nil, stdout, stderr},
@@ -182,7 +189,7 @@ class Neotags
 
         files = {}
         args = Utils.concat(@opts.tools.find.args, { path })
-        output = ''
+        chunks = {}
         @find_handle = loop.spawn(
             @opts.tools.find.binary, {
                 args: args,
@@ -200,14 +207,14 @@ class Neotags
                 @find_handle\close()
                 @find_handle = nil
 
-                files = Utils.explode('\n', output)
+                files = Utils.explode('\n', table.concat(chunks))
                 callback(files)
             )
         )
 
         loop.read_start(stdout, (err, data) ->
             return unless data
-            output = "#{output}#{data}"
+            chunks[#chunks + 1] = data
         )
 
         if @opts.ctags.verbose
@@ -228,15 +235,24 @@ class Neotags
                 elseif vim.bo.tags != tagfile
                     vim.bo.tags = tagfile
 
-                co = coroutine.create(() -> @highlight())
+                if @opts.hl.treesitter
+                    co = coroutine.create(() -> @highlighttreesitter())
+                else
+                    co = coroutine.create(() -> @highlightsyntax())
             when 'clear'
-                co = coroutine.create(() -> @clearsyntax())
+                if @opts.hl.treesitter
+                    co = coroutine.create(() -> @cleartreesitter())
+                else
+                    co = coroutine.create(() -> @clearsyntax())
             else return
 
         return if not co
 
         while true do
-            _, cmd = coroutine.resume(co)
+            ok, cmd = coroutine.resume(co)
+            if not ok
+                vim.notify("neotags: #{cmd}", vim.log.levels.WARN)
+                break
             vim.defer_fn(() ->
                 vim.cmd(cmd),
             10) if cmd
@@ -266,38 +282,91 @@ class Neotags
 
         @syntax_groups[bufnr] = {}
 
+    cleartreesitter: () =>
+        vim.api.nvim_create_augroup('NeotagsLua', { clear: true })
+        bufnr = api.nvim_get_current_buf()
+        @highlighting[bufnr] = false
+        api.nvim_buf_clear_namespace(bufnr, @ns_id, 0, -1)
+
+    maketreesitter: (bufnr, tag_map) =>
+        api.nvim_buf_clear_namespace(bufnr, @ns_id, 0, -1)
+
+        ok, lang = pcall(vim.treesitter.language.get_lang, vim.bo[bufnr].filetype)
+        lang = vim.bo[bufnr].filetype if not ok or not lang
+        return false if not lang or #lang == 0
+
+        ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+        return false if not ok or not parser
+
+        trees = parser\parse()
+        return false unless trees and trees[1]
+
+        root = trees[1]\root()
+
+        query = @query_cache[lang]
+        if not query
+            ok = false
+            ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier)] @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '(identifier) @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '[(name) (simple_identifier)] @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '(name) @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '(simple_identifier) @id')
+            return false if not ok
+            @query_cache[lang] = query
+
+        for _, node in query\iter_captures(root, bufnr, 0, -1)
+            name = vim.treesitter.get_node_text(node, bufnr)
+            if tag_map[name]
+                sr, sc, er, ec = node\range()
+                api.nvim_buf_set_extmark(bufnr, @ns_id, sr, sc, {
+                    end_row: er,
+                    end_col: ec,
+                    hl_group: tag_map[name],
+                    priority: 120,
+                })
+
+        return true
+
     makesyntax: (lang, kind, group, opts, bufnr, langcontains, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
         matches = {}
         keywords = {}
+        matches_seen = {}
+        keywords_seen = {}
 
-        contains = Utils.contains
         allow_keyword = opts.allow_keyword
         prefix = opts.prefix or @opts.hl.prefix
         suffix = opts.suffix or @opts.hl.suffix
         minlen = opts.minlen or @opts.hl.minlen
         yield = coroutine.yield
 
-        forbidden = {
-            '*',
-        }
-
+        any_added = false
         for tag in *group
             continue if #tag.name < minlen
-            continue if contains(added, tag.name\lower())
-            continue if contains(forbidden, tag.name)
+            low = tag.name\lower()
+            continue if added[low]
+            continue if tag.name == '*'
 
             if (prefix == @opts.hl.prefix and suffix == @opts.hl.suffix and
                     allow_keyword != false and not tag.name\find('.', 1, true) and
                     tag.name != 'contains')
-                keywords[#keywords + 1] = tag.name if not contains(keywords, tag.name)
+                unless keywords_seen[tag.name]
+                    keywords[#keywords + 1] = tag.name
+                    keywords_seen[tag.name] = true
             elseif not tag.name\find('.', 1, true)
-                matches[#matches + 1] = tag.name if not contains(matches, tag.name)
+                unless matches_seen[tag.name]
+                    matches[#matches + 1] = tag.name
+                    matches_seen[tag.name] = true
 
-            added[#added + 1] = tag.name\lower()
+            added[low] = true
+            any_added = true
 
-        return if #added == 0
+        return if not any_added
         vim.api.nvim_set_hl(0, hl, { link: opts.group })
 
         table.sort(matches, (a, b) -> a < b)
@@ -338,19 +407,17 @@ class Neotags
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
         @syntax_groups[bufnr][#@syntax_groups[bufnr] + 1] = hl
 
-    highlight: () =>
-        bufnr = api.nvim_get_current_buf()
+    collectgroups: (ft, content) =>
+        old_tagfunc = vim.bo.tagfunc
+        vim.bo.tagfunc = '' if old_tagfunc and #old_tagfunc > 0
+        ok, tags = pcall(vim.fn.taglist, '^[a-zA-Z$_].*$')
+        vim.bo.tagfunc = old_tagfunc if old_tagfunc and #old_tagfunc > 0
+        return {} unless ok
 
-        return if @highlighting[bufnr]
+        word_set = {}
+        for word in content\gmatch('[a-zA-Z$_][a-zA-Z0-9$_]*')
+            word_set[word] = true
 
-        ft = vim.bo.filetype
-        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
-
-        @highlighting[bufnr] = true
-
-        content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
-
-        tags = vim.fn.taglist('^[a-zA-Z$_].*$')
         groups = {}
 
         for tag in *tags
@@ -374,20 +441,91 @@ class Neotags
             if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
                 continue
 
-
             if @opts.ft_map[ft] == nil and ft != tag.language
                 continue
 
-            if not content\find(tag.name)
-                continue
-
-            if not content\find("%W#{tag.name}%W") and not content\find("^#{tag.name}%W")
-                continue
+            continue if not word_set[tag.name]
 
             groups[tag.language] = {} if not groups[tag.language]
             groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
             groups[tag.language][tag.kind][#groups[tag.language][tag.kind] + 1] = tag
 
+        return groups
+
+    highlighttreesitter: () =>
+        bufnr = api.nvim_get_current_buf()
+        return if @highlighting[bufnr]
+
+        ft = vim.bo.filetype
+        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
+
+        @highlighting[bufnr] = true
+
+        content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
+        groups = @collectgroups(ft, content)
+        langmap = @opts.ft_map[ft] or {ft}
+        tag_map = {}
+
+        for klang, vlang in pairs(langmap)
+            lang = vlang if type(klang) != "string"
+
+            if type(klang) == "string"
+                lang = klang
+
+            continue if not @languages[lang] or not @languages[lang].order
+            cl = @languages[lang]
+            order = cl.order
+            kinds = groups[lang]
+            continue if not kinds
+            added = {}
+
+            if @languages[lang].reserved
+                for reserved_name in *@languages[lang].reserved
+                    low = reserved_name\lower()
+                    unless added[low]
+                        tag_map[reserved_name] = 'neotags_Reserved' unless tag_map[reserved_name]
+                        added[low] = true
+
+            for i = 1, #order
+                kind = order\sub(i, i)
+
+                continue if not kinds[kind]
+                continue if not cl.kinds or not cl.kinds[kind]
+                kopts = cl.kinds[kind]
+                hl = "_Neotags_#{lang}_#{kind}_#{kopts.group}"
+                vim.api.nvim_set_hl(0, hl, { link: kopts.group })
+                minlen = kopts.minlen or @opts.hl.minlen
+
+                for tag in *kinds[kind]
+                    continue if #tag.name < minlen
+                    low = tag.name\lower()
+                    continue if added[low]
+                    continue if tag.name == '*'
+                    continue if tag.name\find('.', 1, true)
+
+                    tag_map[tag.name] = hl unless tag_map[tag.name]
+                    added[low] = true
+
+        return if next(tag_map) == nil
+
+        if not @maketreesitter(bufnr, tag_map)
+            @highlighting[bufnr] = false
+            @highlightsyntax()
+            return
+
+        @highlighting[bufnr] = false
+
+    highlightsyntax: () =>
+        bufnr = api.nvim_get_current_buf()
+        return if @highlighting[bufnr]
+
+        ft = vim.bo.filetype
+        return if #ft == 0 or Utils.contains(@opts.ignore, ft)
+
+        @highlighting[bufnr] = true
+
+        content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
+        groups = @collectgroups(ft, content)
         langmap = @opts.ft_map[ft] or {ft}
 
         for klang, vlang in pairs(langmap)
@@ -421,7 +559,8 @@ class Neotags
 
         @highlighting[bufnr] = false
 
-global neotags = Neotags! if not neotags
+if not neotags
+    global neotags = Neotags!
 
 export default {
     setup: (opts) ->
