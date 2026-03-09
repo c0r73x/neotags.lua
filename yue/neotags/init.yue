@@ -288,7 +288,7 @@ class Neotags
         @highlighting[bufnr] = false
         api.nvim_buf_clear_namespace(bufnr, @ns_id, 0, -1)
 
-    maketreesitter: (bufnr, tag_map) =>
+    maketreesitter: (bufnr, tag_map, scope_map) =>
         api.nvim_buf_clear_namespace(bufnr, @ns_id, 0, -1)
 
         ok, lang = pcall(vim.treesitter.language.get_lang, vim.bo[bufnr].filetype)
@@ -306,7 +306,13 @@ class Neotags
         query = @query_cache[lang]
         if not query
             ok = false
-            ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier)] @id')
+            ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier) (field_identifier) (property_identifier)] @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier) (field_identifier)] @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier) (property_identifier)] @id')
+            if not ok
+                ok, query = pcall(vim.treesitter.query.parse, lang, '[(identifier) (type_identifier)] @id')
             if not ok
                 ok, query = pcall(vim.treesitter.query.parse, lang, '(identifier) @id')
             if not ok
@@ -320,12 +326,25 @@ class Neotags
 
         for _, node in query\iter_captures(root, bufnr, 0, -1)
             name = vim.treesitter.get_node_text(node, bufnr)
-            if tag_map[name]
+            hl = tag_map[name]
+            unless hl
+                parent = node\parent()
+                if parent
+                    ptype = parent\type()
+                    if ptype == 'dot_index_expression' or ptype == 'method_index_expression' or ptype == 'member_expression' or ptype == 'field_expression'
+                        obj = parent\named_child(0)
+                        if obj
+                            nsr, nsc = node\range()
+                            osr, osc = obj\range()
+                            if nsr != osr or nsc != osc
+                                scope_text = vim.treesitter.get_node_text(obj, bufnr)
+                                hl = scope_map[scope_text][name] if scope_map and scope_map[scope_text]
+            if hl
                 sr, sc, er, ec = node\range()
                 api.nvim_buf_set_extmark(bufnr, @ns_id, sr, sc, {
                     end_row: er,
                     end_col: ec,
-                    hl_group: tag_map[name],
+                    hl_group: hl,
                     priority: 120,
                 })
 
@@ -396,7 +415,7 @@ class Neotags
             str = table.concat(current, '\\|')
             yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
-        notin = "contained=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
+        notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
 
         table.sort(keywords, (a, b) -> a < b)
         for i = 1, #keywords, patternlength
@@ -406,6 +425,28 @@ class Neotags
 
         @syntax_groups[bufnr] = {} if not @syntax_groups[bufnr]
         @syntax_groups[bufnr][#@syntax_groups[bufnr] + 1] = hl
+
+    makesyntax_scoped: (scope_map, bufnr) =>
+        yield = coroutine.yield
+        patternlength = @opts.hl.patternlength
+
+        notin = ''
+        merged = @opts.notin or {}
+        if #merged > 0
+            notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}"
+
+        for scope, methods in pairs(scope_map)
+            hl_names = {}
+            for name, hl in pairs(methods)
+                hl_names[hl] = {} unless hl_names[hl]
+                hl_names[hl][#hl_names[hl] + 1] = name
+
+            for hl, names in pairs(hl_names)
+                table.sort(names, (a, b) -> a < b)
+                for i = 1, #names, patternlength
+                    current = {unpack(names, i, i + patternlength)}
+                    str = table.concat(current, '\\|')
+                    yield("syntax match #{hl} /\\<#{scope}\\>\\.\\zs\\<\\%(#{str}\\)\\>/ #{notin} display")
 
     collectgroups: (ft, content) =>
         old_tagfunc = vim.bo.tagfunc
@@ -465,6 +506,8 @@ class Neotags
         groups = @collectgroups(ft, content)
         langmap = @opts.ft_map[ft] or {ft}
         tag_map = {}
+        scope_map = {}
+        scope_fields = {'class', 'namespace', 'module', 'interface', 'struct', 'enum'}
 
         for klang, vlang in pairs(langmap)
             lang = vlang if type(klang) != "string"
@@ -506,9 +549,15 @@ class Neotags
                     tag_map[tag.name] = hl unless tag_map[tag.name]
                     added[low] = true
 
+                    for _, field in ipairs(scope_fields)
+                        if tag[field]
+                            scope_map[tag[field]] = {} unless scope_map[tag[field]]
+                            scope_map[tag[field]][tag.name] = hl unless scope_map[tag[field]][tag.name]
+                            break
+
         return if next(tag_map) == nil
 
-        if not @maketreesitter(bufnr, tag_map)
+        if not @maketreesitter(bufnr, tag_map, scope_map)
             @highlighting[bufnr] = false
             @highlightsyntax()
             return
@@ -527,6 +576,9 @@ class Neotags
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
         groups = @collectgroups(ft, content)
         langmap = @opts.ft_map[ft] or {ft}
+        scope_map = {}
+        tag_hl_map = {}
+        scope_fields = {'class', 'namespace', 'module', 'interface', 'struct', 'enum'}
 
         for klang, vlang in pairs(langmap)
             lang = vlang if type(klang) != "string"
@@ -555,8 +607,28 @@ class Neotags
                 continue if not kinds[kind]
                 continue if not cl.kinds or not cl.kinds[kind]
 
+                kopts = cl.kinds[kind]
+                hl = "_Neotags_#{lang}_#{kind}_#{kopts.group}"
+                minlen = kopts.minlen or @opts.hl.minlen
+
+                for tag in *kinds[kind]
+                    continue if #tag.name < minlen
+                    continue if tag.name\find('.', 1, true)
+                    tag_hl_map[tag.name] = hl unless tag_hl_map[tag.name]
+                    for _, field in ipairs(scope_fields)
+                        if tag[field]
+                            scope_map[tag[field]] = {} unless scope_map[tag[field]]
+                            scope_map[tag[field]][tag.name] = hl unless scope_map[tag[field]][tag.name]
+                            break
+
                 @makesyntax(lang, kind, kinds[kind], cl.kinds[kind], bufnr, langcontains, added)
 
+        for scope, name in content\gmatch('([a-zA-Z$_][a-zA-Z0-9$_]*)%.([a-zA-Z$_][a-zA-Z0-9$_]*)')
+            if tag_hl_map[name]
+                scope_map[scope] = {} unless scope_map[scope]
+                scope_map[scope][name] = tag_hl_map[name] unless scope_map[scope][name]
+
+        @makesyntax_scoped(scope_map, bufnr) if next(scope_map)
         @highlighting[bufnr] = false
 
 if not neotags
