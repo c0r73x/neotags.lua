@@ -324,6 +324,7 @@ class Neotags
             return false if not ok
             @query_cache[lang] = query
 
+        matched = false
         for _, node in query\iter_captures(root, bufnr, 0, -1)
             name = vim.treesitter.get_node_text(node, bufnr)
             hl = tag_map[name]
@@ -347,8 +348,9 @@ class Neotags
                     hl_group: hl,
                     priority: 120,
                 })
+                matched = true
 
-        return true
+        return matched
 
     makesyntax: (lang, kind, group, opts, bufnr, langcontains, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
@@ -403,7 +405,7 @@ class Neotags
                     merged[#merged+1] = a[i] if a[i]
                     merged[#merged+1] = b[i] if b[i]
 
-            notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
+            notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
         else
             notin = "contained containedin=#{table.concat(langcontains, ',')}"
 
@@ -415,7 +417,7 @@ class Neotags
             str = table.concat(current, '\\|')
             yield("syntax match #{hl} /#{prefix}\\%(#{str}\\)#{suffix}/ #{notin} display")
 
-        notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
+        notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0 and not langcontains
 
         table.sort(keywords, (a, b) -> a < b)
         for i = 1, #keywords, patternlength
@@ -433,7 +435,7 @@ class Neotags
         notin = ''
         merged = @opts.notin or {}
         if #merged > 0
-            notin = "contained containedin=ALLBUT,#{table.concat(merged, ',')}"
+            notin = "containedin=ALLBUT,#{table.concat(merged, ',')}"
 
         for scope, methods in pairs(scope_map)
             hl_names = {}
@@ -555,7 +557,9 @@ class Neotags
                             scope_map[tag[field]][tag.name] = hl unless scope_map[tag[field]][tag.name]
                             break
 
-        return if next(tag_map) == nil
+        if next(tag_map) == nil
+            @highlighting[bufnr] = false
+            return
 
         if not @maketreesitter(bufnr, tag_map, scope_map)
             @highlighting[bufnr] = false
