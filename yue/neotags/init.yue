@@ -489,48 +489,91 @@ class Neotags
                     str = table.concat(current, '\\|')
                     yield("syntax match #{hl} /\\<#{scope}\\>\\.\\zs\\<\\%(#{str}\\)\\>/ #{notin} display")
 
-    collectgroups: (ft, content) =>
+    -- taglist() over the whole project converts every tag to Lua on each
+    -- call (~150ms for 60k tags). Parse once per set of tag files, re-read
+    -- only when one of them changes, and index by name so a buffer only
+    -- looks up the words it contains.
+    loadtags: () =>
+        files = vim.fn.tagfiles()
+        return {} if #files == 0
+
+        stamp = {}
+        for f in *files
+            st = loop.fs_stat(vim.fn.fnamemodify(f, ':p'))
+            stamp[#stamp + 1] = st and "#{st.mtime.sec}.#{st.mtime.nsec}:#{st.size}" or '-'
+        key = table.concat(files, '\n')
+        stamp = table.concat(stamp, ',')
+
+        @tag_cache = {} unless @tag_cache
+        entry = @tag_cache[key]
+        return entry.by_name if entry and entry.stamp == stamp
+
         old_tagfunc = vim.bo.tagfunc
         vim.bo.tagfunc = '' if old_tagfunc and #old_tagfunc > 0
         ok, tags = pcall(vim.fn.taglist, '^[a-zA-Z$_].*$')
         vim.bo.tagfunc = old_tagfunc if old_tagfunc and #old_tagfunc > 0
         return {} unless ok
 
-        word_set = {}
-        for word in content\gmatch('[a-zA-Z$_][a-zA-Z0-9$_]*')
-            word_set[word] = true
-
-        groups = {}
-
-        for tag in *tags
+        by_name = {}
+        for i, tag in ipairs(tags)
             continue if not tag.language
 
             tag.language = tag.language\lower()
             tag.language = @opts.ft_conv[tag.language] if @opts.ft_conv[tag.language]
+            -- position in taglist() order, the first tag claiming a name wins
+            tag._idx = i
 
-            continue if not @languages[tag.language]
-            continue if not @languages[tag.language].order
-            continue if not @languages[tag.language].order\find(tag.kind)
+            list = by_name[tag.name]
+            unless list
+                list = {}
+                by_name[tag.name] = list
+            list[#list + 1] = tag
 
-            continue if #tag.name < @opts.hl.minlen
+        @tag_cache[key] = { :stamp, :by_name }
+        return by_name
 
-            if @languages[tag.language].reserved
-                continue if Utils.contains(@languages[tag.language].reserved, tag.name)
+    collectgroups: (ft, content) =>
+        by_name = @loadtags()
+        return {} unless next(by_name)
 
-            continue if tag.name\match('^[a-zA-Z]{,2}$')
-            continue if tag.name\match('^_?_?anon')
+        groups = {}
+        seen = {}
 
-            if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
-                continue
+        for word in content\gmatch('[a-zA-Z$_][a-zA-Z0-9$_]*')
+            continue if seen[word]
+            seen[word] = true
 
-            if @opts.ft_map[ft] == nil and ft != tag.language
-                continue
+            tags = by_name[word]
+            continue unless tags
 
-            continue if not word_set[tag.name]
+            for tag in *tags
+                continue if not @languages[tag.language]
+                continue if not @languages[tag.language].order
+                continue if not @languages[tag.language].order\find(tag.kind)
 
-            groups[tag.language] = {} if not groups[tag.language]
-            groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
-            groups[tag.language][tag.kind][#groups[tag.language][tag.kind] + 1] = tag
+                continue if #tag.name < @opts.hl.minlen
+
+                if @languages[tag.language].reserved
+                    continue if Utils.contains(@languages[tag.language].reserved, tag.name)
+
+                continue if tag.name\match('^[a-zA-Z]{,2}$')
+                continue if tag.name\match('^_?_?anon')
+
+                if @opts.ft_map[ft] != nil and Utils.contains(@opts.ft_map[ft], tag.language) == false
+                    continue
+
+                if @opts.ft_map[ft] == nil and ft != tag.language
+                    continue
+
+                groups[tag.language] = {} if not groups[tag.language]
+                groups[tag.language][tag.kind] = {} if not groups[tag.language][tag.kind]
+                groups[tag.language][tag.kind][#groups[tag.language][tag.kind] + 1] = tag
+
+        -- keep the original taglist() order within each kind
+        byidx = (a, b) -> a._idx < b._idx
+        for _, kinds in pairs(groups)
+            for _, list in pairs(kinds)
+                table.sort(list, byidx)
 
         return groups
 
