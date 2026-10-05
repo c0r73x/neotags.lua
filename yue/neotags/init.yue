@@ -352,6 +352,39 @@ class Neotags
 
         return matched
 
+    -- Vim expands a pattern in `containedin=ALLBUT,...` against every syntax
+    -- group name defined in the session, not just this buffer's, so entries
+    -- like 'vim.*' or '.*String.*' grew each rule to thousands of ids. Vim
+    -- scans that list linearly for every candidate item at every position,
+    -- which made redraw ~6x slower. Groups the buffer's syntax doesn't define
+    -- can never contain a match, so resolve patterns against those only.
+    resolvenotin: (list) =>
+        unless @buf_groups
+            @buf_groups = {}
+            for line in vim.fn.execute('syntax list')\gmatch('[^\n]+')
+                name = line\match('^(%S+)%s+xxx')
+                @buf_groups[#@buf_groups + 1] = name if name
+
+        resolved = {}
+        seen = {}
+        for entry in *list
+            -- Plain group/cluster names cost nothing; pass them through
+            unless entry\find('[%.%*%[%]%^%$%?%+\\]')
+                unless seen[entry]
+                    resolved[#resolved + 1] = entry
+                    seen[entry] = true
+                continue
+
+            -- Same rules as Vim's group-list patterns: whole name, ignorecase
+            ok, re = pcall(vim.regex, "\\c^\\%(#{entry}\\)$")
+            continue unless ok
+            for name in *@buf_groups
+                if not seen[name] and re\match_str(name)
+                    resolved[#resolved + 1] = name
+                    seen[name] = true
+
+        resolved
+
     makesyntax: (lang, kind, group, opts, bufnr, langcontains, added) =>
         hl = "_Neotags_#{lang}_#{kind}_#{opts.group}"
 
@@ -405,6 +438,7 @@ class Neotags
                     merged[#merged+1] = a[i] if a[i]
                     merged[#merged+1] = b[i] if b[i]
 
+            merged = @resolvenotin(merged)
             notin = "containedin=ALLBUT,#{table.concat(merged, ',')}" if #merged > 0
         else
             notin = "contained containedin=#{table.concat(langcontains, ',')}"
@@ -433,7 +467,7 @@ class Neotags
         patternlength = @opts.hl.patternlength
 
         notin = ''
-        merged = @opts.notin or {}
+        merged = @resolvenotin(@opts.notin or {})
         if #merged > 0
             notin = "containedin=ALLBUT,#{table.concat(merged, ',')}"
 
@@ -576,6 +610,7 @@ class Neotags
         return if #ft == 0 or Utils.contains(@opts.ignore, ft)
 
         @highlighting[bufnr] = true
+        @buf_groups = nil
 
         content = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
         groups = @collectgroups(ft, content)
