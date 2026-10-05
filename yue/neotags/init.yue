@@ -140,6 +140,7 @@ class Neotags
         stdout = loop.new_pipe(false) if @opts.ctags.verbose
         stderr = loop.new_pipe(false) if @opts.ctags.verbose
 
+        bufnr = api.nvim_get_current_buf()
         @ctags_handle = loop.spawn(
             @opts.ctags.binary, {
                 args: args,
@@ -157,7 +158,11 @@ class Neotags
                 @ctags_handle\close()
                 @ctags_handle = nil
 
-                vim.bo.tags = tagfile
+                -- No tags file means ctags failed or had nothing to index;
+                -- running highlight again would respawn ctags in a loop
+                return if vim.fn.filereadable(tagfile) == 0
+
+                vim.bo[bufnr].tags = tagfile if api.nvim_buf_is_valid(bufnr)
 
                 @run('highlight')
             )
